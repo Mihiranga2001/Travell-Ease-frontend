@@ -1,22 +1,27 @@
-import logo from "../assets/Travell-logo-transparent.png";
-import defaultImage from "../assets/default.jpg";
-
 export default function Header() {
   return (
-    <header className="bg-blue-500 h-20 flex items-center justify-between px-10">
-      <img src={logo} alt="Travell Ease" className="h-16" />
+    <header className="bg-accent h-20 flex items-center justify-between px-10 shadow-md">
+      <img src="/logo.png" alt="Travell Ease" className="h-16" />
 
-      <nav className="flex gap-6 text-white text-xl font-semibold">
-        <a href="#">Home</a>
-        <a href="#">Places</a>
-        <a href="#">About</a>
-        <a href="#">Contact</a>
+      <nav className="flex gap-6 text-primary text-xl font-semibold">
+        <a href="#" className="hover:text-orange transition-colors">
+          Home
+        </a>
+        <a href="#" className="hover:text-orange transition-colors">
+          Places
+        </a>
+        <a href="#" className="hover:text-orange transition-colors">
+          About
+        </a>
+        <a href="#" className="hover:text-orange transition-colors">
+          Contact
+        </a>
       </nav>
 
       <img
-        src={defaultImage} // Replace with the actual image URL or path to your default"
+        src="/default.jpg"
         alt="profile"
-        className="w-12 h-12 rounded-full"
+        className="w-12 h-12 rounded-full object-cover border-2 border-orange"
       />
     </header>
   );

@@ -1,11 +1,10 @@
-import logo from "../assets/Travell-logo-transparent.png";
 
 export default function Footer() {
   return (
-    <footer className="bg-slate-900 text-white">
+    <footer className="bg-accent/80 text-primary">
       <div className="grid grid-cols-4 gap-8 px-10 py-6">
         <div>
-          <img src={logo} alt="Travell Ease" className="h-16 mb-4" />
+          <img src="/logo.png" alt="Travell Ease" className="h-16 mb-4" />
           <p className="text-sm">Discover amazing places easily.</p>
           <p className="text-sm">Plan your journey faster and smarter.</p>
         </div>
@@ -35,7 +34,7 @@ export default function Footer() {
         </div>
       </div>
 
-      <div className="bg-slate-700 text-center py-2">
+      <div className="bg-primary/20 text-center py-2">
         © 2026 Travell Ease. All rights reserved.
       </div>
     </footer>
