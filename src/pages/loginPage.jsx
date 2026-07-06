@@ -1,25 +1,40 @@
 import { FcGoogle } from "react-icons/fc";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import axios from "axios";
+import { toast } from "react-hot-toast";
+
 
 export default function LoginPage() {
 
     const[email,setEmail] = useState("")
     const[password,setPassword] = useState("")
+    const navigate = useNavigate()//use to smooth webpage go another web page
 
     async function login(){
         console.log("Email: ",email);
         console.log("Password: ",password);
 
         try{
-            const res = await axios.post("http://localhost:3000/users/login",{
+            const res = await axios.post(import.meta.env.VITE_BACKEND_URL + "/users/login",{
                 email : email,
                 password : password,
             })
 
-            console.log(res.data);
+            console.log(res);
+            if(res.data.role == "admin"){
+                //window.location.href = "/admin"
+                navigate("/admin")
+            }else{
+                //window.location.href = "/"
+                navigate("/")
+            }
+            //alert("Login Successfull");
+            toast.success("Login Successfull");
+
         }catch(err){
+            //alert("Login Failed");
+            toast.error("Login Failed");
             console.log(err)
         }
 
