@@ -3,6 +3,20 @@ import {FiUsers,FiMapPin,FiImage,FiBarChart2,} from "react-icons/fi";
 import {FaHotel,FaCar,FaUserTie,FaRobot,} from "react-icons/fa";
 import {LuClipboardList,} from "react-icons/lu";
 import { Link, Route, Routes } from "react-router-dom";
+import AdminDashboardPage from "./admin/adminDashboardPage";
+import AdminUsersPage from "./admin/adminUsersPage";
+import AdminTouristPlacesPage from "./admin/adminTouristPlacesPage";
+import AdminHotelsPage from "./admin/adminHotelsPage";
+import AdminVehiclesPage from "./admin/adminVehiclesPage";
+import AdminTravelGuidesPage from "./admin/adminTravelGuidesPage";
+import AdminBookingsPage from "./admin/adminBookingsPage";
+import AdminMediaApprovalPage from "./admin/adminMediaApprovalPage";
+import AdminReviewsPage from "./admin/adminReviewsPage";
+import AdminApprovalsPage from "./admin/adminApprovalsPage";
+import AdminAIMonitoringPage from "./admin/adminAIMonitoringPage";
+import AdminReportsPage from "./admin/adminReportsPage";
+import AdminSettingsPage from "./admin/adminSettingsPage";
+
 
 export default function AdminPage() {
   return (
@@ -45,39 +59,31 @@ export default function AdminPage() {
         </div>
         <div className="w-[calc(100%-250px)] min-h-screen max-h-full bg-primary border-[10px] rounded-3xl border-accent">
             <Routes>
-                <Route path="/" element={<h1>AdminDashboardPage</h1>} />
+                <Route path="/" element={<AdminDashboardPage/>} />
 
-                <Route path="/users" element={<h1>AdminUsersPage</h1>} />
+                <Route path="/users" element={<AdminUsersPage />} />
 
-                <Route path="/places" element={<h1>AdminPlacesPage</h1>} />
-                <Route path="/add-place" element={<h1>AdminAddPlacePage</h1>} />
-                <Route path="/update-place" element={<h1>AdminUpdatePlacePage</h1>} />
+                <Route path="/places" element={<AdminTouristPlacesPage />} />
 
-                <Route path="/hotels" element={<h1>AdminHotelsPage</h1>} />
-                <Route path="/add-hotel" element={<h1>AdminAddHotelPage</h1>} />
-                <Route path="/update-hotel" element={<h1>AdminUpdateHotelPage</h1>} />
+                <Route path="/hotels" element={<AdminHotelsPage />} />
 
-                <Route path="/vehicles" element={<h1>AdminVehiclesPage</h1>} />
-                <Route path="/add-vehicle" element={<h1>AdminAddVehiclePage</h1>} />
-                <Route path="/update-vehicle" element={<h1>AdminUpdateVehiclePage</h1>} />
+                <Route path="/vehicles" element={<AdminVehiclesPage/>} />
 
-                <Route path="/guides" element={<h1>AdminGuidesPage</h1>} />
-                <Route path="/add-guide" element={<h1>AdminAddGuidePage</h1>} />
-                <Route path="/update-guide" element={<h1>AdminUpdateGuidePage</h1>} />
+                <Route path="/guides" element={<AdminTravelGuidesPage/>} />
 
-                <Route path="/bookings" element={<h1>AdminBookingsPage</h1>} />
+                <Route path="/bookings" element={<AdminBookingsPage/>} />
 
-                <Route path="/media" element={<h1>AdminMediaApprovalPage</h1>} />
+                <Route path="/media" element={<AdminMediaApprovalPage/>} />
 
-                <Route path="/reviews" element={<h1>AdminReviewsPage</h1>} />
+                <Route path="/reviews" element={<AdminReviewsPage/>} />
 
-                <Route path="/approvals" element={<h1>AdminApprovalsPage</h1>} />
+                <Route path="/approvals" element={<AdminApprovalsPage/>} />
 
-                <Route path="/ai-monitoring" element={<h1>AdminAIMonitoringPage</h1>} />
+                <Route path="/ai-monitoring" element={<AdminAIMonitoringPage/>} />
 
-                <Route path="/reports" element={<h1>AdminReportsPage</h1>} />
+                <Route path="/reports" element={<AdminReportsPage/>} />
 
-                <Route path="/settings" element={<h1>AdminSettingsPage</h1>} />
+                <Route path="/settings" element={<AdminSettingsPage/>}/>
             </Routes>    
         </div>
     </div>
