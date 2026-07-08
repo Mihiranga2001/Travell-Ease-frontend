@@ -12,7 +12,24 @@ import {
 } from "react-icons/fa";
 import { FiRefreshCw } from "react-icons/fi";
 
-const API_URL = "http://localhost:3000/api";
+const RAW_API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+const API_BASE_URL = RAW_API_URL.endsWith("/api")
+  ? RAW_API_URL.replace("/api", "")
+  : RAW_API_URL;
+
+const API_URL = `${API_BASE_URL}/api`;
+
+const CATEGORY_OPTIONS = [
+  { value: "historical", label: "Historical" },
+  { value: "beach", label: "Beach" },
+  { value: "nature", label: "Nature" },
+  { value: "religious", label: "Religious" },
+  { value: "adventure", label: "Adventure" },
+  { value: "wildlife", label: "Wildlife" },
+  { value: "mountain", label: "Mountain" },
+  { value: "city", label: "City" },
+  { value: "other", label: "Other" },
+];
 
 export default function AdminTouristPlacesPage() {
   const [places, setPlaces] = useState([]);
@@ -41,10 +58,15 @@ export default function AdminTouristPlacesPage() {
     bestTimeToVisit: "",
     images: "",
     status: "active",
+    isFeatured: false,
   });
 
   function getAuthHeader() {
     const token = localStorage.getItem("token");
+
+    if (!token) {
+      return {};
+    }
 
     return {
       headers: {
@@ -94,12 +116,14 @@ export default function AdminTouristPlacesPage() {
     }
 
     if (categoryFilter !== "all") {
-      result = result.filter((place) => place.category === categoryFilter);
+      result = result.filter(
+        (place) => normalizeCategory(place.category) === categoryFilter
+      );
     }
 
     if (statusFilter !== "all") {
       result = result.filter((place) => {
-        const status = place.status || (place.isActive === false ? "inactive" : "active");
+        const status = getPlaceStatus(place);
         return status === statusFilter;
       });
     }
@@ -123,6 +147,7 @@ export default function AdminTouristPlacesPage() {
       bestTimeToVisit: "",
       images: "",
       status: "active",
+      isFeatured: false,
     });
 
     setEditingPlace(null);
@@ -137,10 +162,16 @@ export default function AdminTouristPlacesPage() {
   function openEditForm(place) {
     setEditingPlace(place);
 
+    const imageText = Array.isArray(place.images)
+      ? place.images.join(", ")
+      : place.image
+      ? place.image
+      : "";
+
     setFormData({
       name: place.name || "",
       description: place.description || "",
-      category: place.category || "historical",
+      category: normalizeCategory(place.category) || "historical",
       city: place.city || "",
       district: place.district || "",
       province: place.province || "",
@@ -158,19 +189,21 @@ export default function AdminTouristPlacesPage() {
       entryFee: place.entryFee || "",
       openingHours: place.openingHours || "",
       bestTimeToVisit: place.bestTimeToVisit || "",
-      images: Array.isArray(place.images) ? place.images.join(", ") : "",
-      status: place.status || "active",
+      images: imageText,
+      status: getPlaceStatus(place),
+      isFeatured: place.isFeatured || false,
     });
 
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function handleInputChange(e) {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
 
     setFormData((prev) => ({
       ...prev,
-      [name]: value,
+      [name]: type === "checkbox" ? checked : value,
     }));
   }
 
@@ -188,6 +221,14 @@ export default function AdminTouristPlacesPage() {
         return;
       }
 
+      const imageArray = formData.images
+        .split(",")
+        .map((image) => image.trim())
+        .filter((image) => image !== "");
+
+      const latitude = Number(formData.latitude) || 0;
+      const longitude = Number(formData.longitude) || 0;
+
       const placePayload = {
         name: formData.name,
         description: formData.description,
@@ -196,22 +237,19 @@ export default function AdminTouristPlacesPage() {
         district: formData.district,
         province: formData.province,
         address: formData.address,
-        latitude: Number(formData.latitude) || 0,
-        longitude: Number(formData.longitude) || 0,
+        latitude,
+        longitude,
         entryFee: Number(formData.entryFee) || 0,
         openingHours: formData.openingHours,
         bestTimeToVisit: formData.bestTimeToVisit,
-        images: formData.images
-          .split(",")
-          .map((image) => image.trim())
-          .filter((image) => image !== ""),
+        images: imageArray,
+        image: imageArray[0] || "",
         status: formData.status,
+        isActive: formData.status === "active",
+        isFeatured: formData.isFeatured,
         location: {
           type: "Point",
-          coordinates: [
-            Number(formData.longitude) || 0,
-            Number(formData.latitude) || 0,
-          ],
+          coordinates: [longitude, latitude],
           address: formData.address,
         },
       };
@@ -276,11 +314,9 @@ export default function AdminTouristPlacesPage() {
   }
 
   const totalPlaces = places.length;
-  const activePlaces = places.filter(
-    (place) => (place.status || "active") === "active"
-  ).length;
+  const activePlaces = places.filter((place) => getPlaceStatus(place) === "active").length;
   const inactivePlaces = places.filter(
-    (place) => place.status === "inactive" || place.isActive === false
+    (place) => getPlaceStatus(place) === "inactive"
   ).length;
   const featuredPlaces = places.filter((place) => place.isFeatured).length;
 
@@ -292,6 +328,7 @@ export default function AdminTouristPlacesPage() {
           <h1 className="text-3xl font-bold text-accent">
             Tourist Places Management
           </h1>
+
           <p className="text-gray-500 mt-[5px]">
             Add, update, delete and manage tourist destinations for Travel Ease.
           </p>
@@ -350,11 +387,12 @@ export default function AdminTouristPlacesPage() {
       {/* Add/Edit Form */}
       {showForm && (
         <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px] mb-[25px]">
-          <div className="flex justify-between items-center mb-[20px]">
+          <div className="flex justify-between items-start gap-4 mb-[20px]">
             <div>
               <h2 className="text-xl font-bold text-gray-800">
                 {editingPlace ? "Update Tourist Place" : "Add New Tourist Place"}
               </h2>
+
               <p className="text-sm text-gray-500">
                 Enter tourist place details, location, images and visiting
                 information.
@@ -377,6 +415,7 @@ export default function AdminTouristPlacesPage() {
                 value={formData.name}
                 onChange={handleInputChange}
                 placeholder="Example: Sigiriya Rock Fortress"
+                required
               />
 
               <SelectField
@@ -384,17 +423,7 @@ export default function AdminTouristPlacesPage() {
                 name="category"
                 value={formData.category}
                 onChange={handleInputChange}
-                options={[
-                  { value: "historical", label: "Historical" },
-                  { value: "beach", label: "Beach" },
-                  { value: "nature", label: "Nature" },
-                  { value: "religious", label: "Religious" },
-                  { value: "adventure", label: "Adventure" },
-                  { value: "wildlife", label: "Wildlife" },
-                  { value: "mountain", label: "Mountain" },
-                  { value: "city", label: "City" },
-                  { value: "other", label: "Other" },
-                ]}
+                options={CATEGORY_OPTIONS}
               />
 
               <InputField
@@ -484,6 +513,7 @@ export default function AdminTouristPlacesPage() {
                 <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
                   Image URLs
                 </label>
+
                 <input
                   type="text"
                   name="images"
@@ -492,18 +522,37 @@ export default function AdminTouristPlacesPage() {
                   placeholder="Paste image URLs separated by commas"
                   className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
                 />
+
+                <p className="text-xs text-gray-400 mt-1">
+                  Example: https://example.com/image1.jpg, https://example.com/image2.jpg
+                </p>
+              </div>
+
+              <div className="md:col-span-2">
+                <label className="flex items-center gap-3 text-sm font-semibold text-gray-700">
+                  <input
+                    type="checkbox"
+                    name="isFeatured"
+                    checked={formData.isFeatured}
+                    onChange={handleInputChange}
+                    className="w-4 h-4 accent-accent"
+                  />
+                  Mark as Featured Place
+                </label>
               </div>
 
               <div className="md:col-span-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
                   Description
                 </label>
+
                 <textarea
                   name="description"
                   value={formData.description}
                   onChange={handleInputChange}
                   placeholder="Write place description"
                   rows="4"
+                  required
                   className="w-full border border-gray-300 rounded-lg px-[12px] py-[10px] focus:outline-none focus:ring-2 focus:ring-accent"
                 />
               </div>
@@ -534,6 +583,7 @@ export default function AdminTouristPlacesPage() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-[15px]">
           <div className="relative">
             <FaSearch className="absolute top-[15px] left-[15px] text-gray-400" />
+
             <input
               type="text"
               placeholder="Search by name, city, district or category"
@@ -549,15 +599,11 @@ export default function AdminTouristPlacesPage() {
             className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">All Categories</option>
-            <option value="historical">Historical</option>
-            <option value="beach">Beach</option>
-            <option value="nature">Nature</option>
-            <option value="religious">Religious</option>
-            <option value="adventure">Adventure</option>
-            <option value="wildlife">Wildlife</option>
-            <option value="mountain">Mountain</option>
-            <option value="city">City</option>
-            <option value="other">Other</option>
+            {CATEGORY_OPTIONS.map((category) => (
+              <option key={category.value} value={category.value}>
+                {category.label}
+              </option>
+            ))}
           </select>
 
           <select
@@ -576,9 +622,8 @@ export default function AdminTouristPlacesPage() {
       <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px]">
         <div className="flex justify-between items-center mb-[20px]">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">
-              Tourist Places
-            </h2>
+            <h2 className="text-xl font-bold text-gray-800">Tourist Places</h2>
+
             <p className="text-sm text-gray-500">
               Showing {filteredPlaces.length} place(s)
             </p>
@@ -605,97 +650,106 @@ export default function AdminTouristPlacesPage() {
               </thead>
 
               <tbody>
-                {filteredPlaces.map((place) => (
-                  <tr key={place._id} className="border-b text-sm">
-                    <td className="py-[14px]">
-                      <div className="flex items-center gap-[12px]">
-                        {place.images?.[0] ? (
-                          <img
-                            src={place.images[0]}
-                            alt={place.name}
-                            className="w-[60px] h-[45px] rounded-lg object-cover border"
-                          />
-                        ) : (
-                          <div className="w-[60px] h-[45px] rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400">
-                            <FaImage />
+                {filteredPlaces.map((place) => {
+                  const firstImage = getPlaceImage(place);
+                  const status = getPlaceStatus(place);
+
+                  return (
+                    <tr key={place._id || place.id} className="border-b text-sm">
+                      <td className="py-[14px]">
+                        <div className="flex items-center gap-[12px]">
+                          {firstImage ? (
+                            <img
+                              src={firstImage}
+                              alt={place.name}
+                              className="w-[60px] h-[45px] rounded-lg object-cover border"
+                            />
+                          ) : (
+                            <div className="w-[60px] h-[45px] rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400">
+                              <FaImage />
+                            </div>
+                          )}
+
+                          <div>
+                            <p className="font-bold text-gray-800">
+                              {place.name || "Untitled Place"}
+                            </p>
+
+                            <p className="text-xs text-gray-400 line-clamp-1 max-w-[260px]">
+                              {place.description || "No description"}
+                            </p>
+
+                            {place.isFeatured && (
+                              <p className="text-xs text-orange font-semibold mt-1">
+                                Featured
+                              </p>
+                            )}
                           </div>
-                        )}
-
-                        <div>
-                          <p className="font-bold text-gray-800">
-                            {place.name}
-                          </p>
-                          <p className="text-xs text-gray-400 line-clamp-1 max-w-[260px]">
-                            {place.description || "No description"}
-                          </p>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="py-[14px] text-gray-600 capitalize">
-                      {place.category || "other"}
-                    </td>
+                      <td className="py-[14px] text-gray-600 capitalize">
+                        {getCategoryLabel(place.category)}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      <p>{place.city || "Not added"}</p>
-                      <p className="text-xs text-gray-400">
-                        {place.district || place.province || ""}
-                      </p>
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        <p>{place.city || "Not added"}</p>
 
-                    <td className="py-[14px] text-gray-600">
-                      Rs. {place.entryFee || 0}
-                    </td>
+                        <p className="text-xs text-gray-400">
+                          {place.district || place.province || ""}
+                        </p>
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      <div className="flex items-center gap-[5px]">
-                        <FaStar className="text-orange" />
-                        {place.averageRating || place.rating || 0}
-                      </div>
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        Rs. {place.entryFee || 0}
+                      </td>
 
-                    <td className="py-[14px]">
-                      <select
-                        value={
-                          place.status ||
-                          (place.isActive === false ? "inactive" : "active")
-                        }
-                        onChange={(e) =>
-                          handleStatusChange(place, e.target.value)
-                        }
-                        className={`px-[10px] py-[6px] rounded-lg text-xs text-white border-none outline-none ${
-                          place.status === "inactive" ||
-                          place.isActive === false
-                            ? "bg-red-600"
-                            : "bg-green-600"
-                        }`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        <div className="flex items-center gap-[5px]">
+                          <FaStar className="text-orange" />
+                          {place.averageRating || place.rating || 0}
+                        </div>
+                      </td>
 
-                    <td className="py-[14px]">
-                      <div className="flex justify-center gap-[8px]">
-                        <button
-                          onClick={() => openEditForm(place)}
-                          className="w-[35px] h-[35px] rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white"
-                          title="Edit Place"
+                      <td className="py-[14px]">
+                        <select
+                          value={status}
+                          onChange={(e) =>
+                            handleStatusChange(place, e.target.value)
+                          }
+                          className={`px-[10px] py-[6px] rounded-lg text-xs text-white border-none outline-none ${
+                            status === "inactive"
+                              ? "bg-red-600"
+                              : "bg-green-600"
+                          }`}
                         >
-                          <FaEdit />
-                        </button>
+                          <option value="active">Active</option>
+                          <option value="inactive">Inactive</option>
+                        </select>
+                      </td>
 
-                        <button
-                          onClick={() => handleDeletePlace(place)}
-                          className="w-[35px] h-[35px] rounded-lg bg-red-600 hover:bg-red-700 flex items-center justify-center text-white"
-                          title="Delete Place"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      <td className="py-[14px]">
+                        <div className="flex justify-center gap-[8px]">
+                          <button
+                            onClick={() => openEditForm(place)}
+                            className="w-[35px] h-[35px] rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white"
+                            title="Edit Place"
+                          >
+                            <FaEdit />
+                          </button>
+
+                          <button
+                            onClick={() => handleDeletePlace(place)}
+                            className="w-[35px] h-[35px] rounded-lg bg-red-600 hover:bg-red-700 flex items-center justify-center text-white"
+                            title="Delete Place"
+                          >
+                            <FaTrash />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {filteredPlaces.length === 0 && (
                   <tr>
@@ -733,7 +787,14 @@ function PlaceStatCard({ title, value, icon, color }) {
   );
 }
 
-function InputField({ label, name, value, onChange, placeholder }) {
+function InputField({
+  label,
+  name,
+  value,
+  onChange,
+  placeholder,
+  required = false,
+}) {
   return (
     <div>
       <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
@@ -746,6 +807,7 @@ function InputField({ label, name, value, onChange, placeholder }) {
         value={value}
         onChange={onChange}
         placeholder={placeholder}
+        required={required}
         className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
       />
     </div>
@@ -773,4 +835,40 @@ function SelectField({ label, name, value, onChange, options }) {
       </select>
     </div>
   );
+}
+
+function normalizeCategory(category) {
+  if (!category) return "other";
+  return String(category).toLowerCase();
+}
+
+function getCategoryLabel(category) {
+  const normalized = normalizeCategory(category);
+  const found = CATEGORY_OPTIONS.find((item) => item.value === normalized);
+  return found ? found.label : "Other";
+}
+
+function getPlaceStatus(place) {
+  if (place.status) return place.status;
+  if (place.isActive === false) return "inactive";
+  return "active";
+}
+
+function getPlaceImage(place) {
+  const image =
+    place.images?.[0] ||
+    place.image ||
+    place.imageUrl ||
+    place.photo ||
+    place.thumbnail;
+
+  if (!image) return "";
+
+  if (image.startsWith("http")) return image;
+
+  if (image.startsWith("/")) {
+    return `${API_BASE_URL}${image}`;
+  }
+
+  return `${API_BASE_URL}/${image}`;
 }
