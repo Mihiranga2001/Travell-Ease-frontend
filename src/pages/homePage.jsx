@@ -16,7 +16,7 @@ import {
   FaPlaneDeparture,
 } from "react-icons/fa";
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 const PLACES_API = `${API_BASE_URL}/api/places`;
 
 export default function HomePage() {

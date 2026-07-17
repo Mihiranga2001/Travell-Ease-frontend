@@ -1,69 +1,40 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import {
+  FaCheckCircle,
+  FaEye,
   FaHotel,
-  FaPlus,
-  FaEdit,
-  FaTrash,
+  FaImage,
   FaSearch,
   FaStar,
-  FaImage,
-  FaCheckCircle,
+  FaTimes,
   FaTimesCircle,
+  FaTrash,
 } from "react-icons/fa";
 import { FiRefreshCw } from "react-icons/fi";
 
-const API_URL = "http://localhost:3000/api";
-
-const EMPTY_ROOM_TYPE = {
-  name: "",
-  pricePerNight: "",
-  capacity: "",
-};
-
-function isValidMongoObjectId(value) {
-  return /^[a-fA-F0-9]{24}$/.test(value);
-}
-
-function getApiErrorMessage(error, fallbackMessage) {
-  return (
-    error.response?.data?.message ||
-    error.response?.data?.error ||
-    error.message ||
-    fallbackMessage
-  );
-}
+const API_URL =
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:3000/api";
 
 export default function AdminHotelsPage() {
   const [hotels, setHotels] = useState([]);
-  const [filteredHotels, setFilteredHotels] = useState([]);
-
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [updatingHotelId, setUpdatingHotelId] = useState("");
+  const [deletingHotelId, setDeletingHotelId] = useState("");
+
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
   const [approvalFilter, setApprovalFilter] = useState("all");
+  const [availabilityFilter, setAvailabilityFilter] = useState("all");
 
-  const [showForm, setShowForm] = useState(false);
-  const [editingHotel, setEditingHotel] = useState(null);
-
-  // Separate useState variables matching the Hotel model
-  const [ownerId, setOwnerId] = useState("");
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [address, setAddress] = useState("");
-  const [latitude, setLatitude] = useState("");
-  const [longitude, setLongitude] = useState("");
-  const [images, setImages] = useState([]);
-  const [roomTypes, setRoomTypes] = useState([{ ...EMPTY_ROOM_TYPE }]);
-  const [contactNumber, setContactNumber] = useState("");
-  const [rating, setRating] = useState(0);
-  const [isAvailable, setIsAvailable] = useState(true);
-  const [isApproved, setIsApproved] = useState(false);
+  const [selectedHotel, setSelectedHotel] = useState(null);
 
   function getAuthHeader() {
     const token = localStorage.getItem("token");
+
+    if (!token) {
+      throw new Error("Please log in again");
+    }
 
     return {
       headers: {
@@ -72,25 +43,23 @@ export default function AdminHotelsPage() {
     };
   }
 
+  function getApiErrorMessage(error, fallbackMessage) {
+    return (
+      error?.response?.data?.message ||
+      error?.response?.data?.error ||
+      error?.message ||
+      fallbackMessage
+    );
+  }
+
   async function loadHotels() {
     try {
       setLoading(true);
 
-      let response;
-
-      try {
-        response = await axios.get(
-          `${API_URL}/hotels/admin/all`,
-          getAuthHeader()
-        );
-      } catch (adminRouteError) {
-        console.warn(
-          "Admin hotel route failed. Trying the normal hotel route.",
-          adminRouteError
-        );
-
-        response = await axios.get(`${API_URL}/hotels`, getAuthHeader());
-      }
+      const response = await axios.get(
+        `${API_URL}/hotels/admin/all`,
+        getAuthHeader()
+      );
 
       const hotelList = Array.isArray(response.data)
         ? response.data
@@ -98,9 +67,9 @@ export default function AdminHotelsPage() {
 
       setHotels(hotelList);
     } catch (error) {
-      console.error(error);
-      toast.error(getApiErrorMessage(error, "Failed to load hotels"));
+      console.error("Load hotels error:", error);
       setHotels([]);
+      toast.error(getApiErrorMessage(error, "Failed to load hotels"));
     } finally {
       setLoading(false);
     }
@@ -110,354 +79,77 @@ export default function AdminHotelsPage() {
     loadHotels();
   }, []);
 
-  useEffect(() => {
-    let result = [...hotels];
+  const filteredHotels = useMemo(() => {
+    const search = searchText.trim().toLowerCase();
 
-    if (searchText.trim() !== "") {
-      const search = searchText.trim().toLowerCase();
+    return hotels.filter((hotel) => {
+      const ownerName =
+        hotel.ownerId?.name ||
+        hotel.ownerId?.email ||
+        hotel.owner?.name ||
+        "";
 
-      result = result.filter((hotel) => {
-        const hotelOwnerName =
-          hotel.ownerId?.name || hotel.owner?.name || hotel.ownerName || "";
+      const ownerId =
+        typeof hotel.ownerId === "string"
+          ? hotel.ownerId
+          : hotel.ownerId?._id || hotel.owner?._id || "";
 
-        const hotelOwnerId =
-          typeof hotel.ownerId === "string"
-            ? hotel.ownerId
-            : hotel.ownerId?._id || hotel.owner?._id || "";
+      const roomTypeText = Array.isArray(hotel.roomTypes)
+        ? hotel.roomTypes.map((room) => room.name || "").join(" ")
+        : "";
 
-        return (
-          String(hotel.name || "").toLowerCase().includes(search) ||
-          String(hotel.address || "").toLowerCase().includes(search) ||
-          String(hotel.contactNumber || "").toLowerCase().includes(search) ||
-          String(hotelOwnerName).toLowerCase().includes(search) ||
-          String(hotelOwnerId).toLowerCase().includes(search)
-        );
-      });
-    }
+      const matchesSearch =
+        search === "" ||
+        String(hotel.name || "").toLowerCase().includes(search) ||
+        String(hotel.address || "").toLowerCase().includes(search) ||
+        String(hotel.contactNumber || "").toLowerCase().includes(search) ||
+        String(ownerName).toLowerCase().includes(search) ||
+        String(ownerId).toLowerCase().includes(search) ||
+        roomTypeText.toLowerCase().includes(search);
 
-    if (statusFilter !== "all") {
-      result = result.filter((hotel) => {
-        if (statusFilter === "available") {
-          return hotel.isAvailable !== false;
-        }
+      const matchesApproval =
+        approvalFilter === "all" ||
+        (approvalFilter === "approved" &&
+          hotel.isApproved === true) ||
+        (approvalFilter === "pending" &&
+          hotel.isApproved !== true);
 
-        return hotel.isAvailable === false;
-      });
-    }
+      const matchesAvailability =
+        availabilityFilter === "all" ||
+        (availabilityFilter === "available" &&
+          hotel.isAvailable !== false) ||
+        (availabilityFilter === "unavailable" &&
+          hotel.isAvailable === false);
 
-    if (approvalFilter !== "all") {
-      result = result.filter((hotel) => {
-        if (approvalFilter === "approved") {
-          return hotel.isApproved === true;
-        }
-
-        return hotel.isApproved !== true;
-      });
-    }
-
-    setFilteredHotels(result);
-  }, [searchText, statusFilter, approvalFilter, hotels]);
-
-  function resetForm() {
-    setOwnerId("");
-    setName("");
-    setDescription("");
-    setAddress("");
-    setLatitude("");
-    setLongitude("");
-    setImages([]);
-    setRoomTypes([{ ...EMPTY_ROOM_TYPE }]);
-    setContactNumber("");
-    setRating(0);
-    setIsAvailable(true);
-    setIsApproved(false);
-
-    setEditingHotel(null);
-    setShowForm(false);
-  }
-
-  function openAddForm() {
-    resetForm();
-    setShowForm(true);
-  }
-
-  function openEditForm(hotel) {
-    setEditingHotel(hotel);
-
-    setOwnerId(
-      typeof hotel.ownerId === "string"
-        ? hotel.ownerId
-        : hotel.ownerId?._id || hotel.owner?._id || ""
-    );
-    setName(hotel.name || "");
-    setDescription(hotel.description || "");
-    setAddress(hotel.address || "");
-    setLatitude(hotel.location?.latitude ?? "");
-    setLongitude(hotel.location?.longitude ?? "");
-    setImages(Array.isArray(hotel.images) ? hotel.images : []);
-    setRoomTypes(
-      Array.isArray(hotel.roomTypes) && hotel.roomTypes.length > 0
-        ? hotel.roomTypes.map((room) => ({
-            name: room.name || "",
-            pricePerNight: room.pricePerNight ?? "",
-            capacity: room.capacity ?? "",
-          }))
-        : [{ ...EMPTY_ROOM_TYPE }]
-    );
-    setContactNumber(hotel.contactNumber || "");
-    setRating(hotel.rating ?? 0);
-    setIsAvailable(hotel.isAvailable !== false);
-    setIsApproved(hotel.isApproved === true);
-
-    setShowForm(true);
-  }
-
-  function handleImagesChange(e) {
-    const imageList = e.target.value
-      .split(",")
-      .map((image) => image.trim())
-      .filter(Boolean);
-
-    setImages(imageList);
-  }
-
-  function handleRoomTypeChange(index, field, value) {
-    setRoomTypes((previousRoomTypes) =>
-      previousRoomTypes.map((room, roomIndex) =>
-        roomIndex === index
-          ? {
-              ...room,
-              [field]: value,
-            }
-          : room
-      )
-    );
-  }
-
-  function addRoomType() {
-    setRoomTypes((previousRoomTypes) => [
-      ...previousRoomTypes,
-      { ...EMPTY_ROOM_TYPE },
-    ]);
-  }
-
-  function removeRoomType(index) {
-    if (roomTypes.length === 1) {
-      toast.error("At least one room type is required");
-      return;
-    }
-
-    setRoomTypes((previousRoomTypes) =>
-      previousRoomTypes.filter((_, roomIndex) => roomIndex !== index)
-    );
-  }
-
-  function validateAndBuildPayload() {
-    const cleanOwnerId = ownerId.trim();
-    const cleanName = name.trim();
-    const cleanDescription = description.trim();
-    const cleanAddress = address.trim();
-    const cleanContactNumber = contactNumber.trim();
-
-    if (!cleanOwnerId) {
-      toast.error("Owner ID is required");
-      return null;
-    }
-
-    if (!isValidMongoObjectId(cleanOwnerId)) {
-      toast.error("Owner ID must be a valid 24-character MongoDB ID");
-      return null;
-    }
-
-    if (cleanName.length < 2) {
-      toast.error("Hotel name must contain at least 2 characters");
-      return null;
-    }
-
-    if (cleanName.length > 150) {
-      toast.error("Hotel name cannot exceed 150 characters");
-      return null;
-    }
-
-    if (cleanDescription.length < 10) {
-      toast.error("Description must contain at least 10 characters");
-      return null;
-    }
-
-    if (cleanDescription.length > 3000) {
-      toast.error("Description cannot exceed 3000 characters");
-      return null;
-    }
-
-    if (cleanAddress.length > 500) {
-      toast.error("Address cannot exceed 500 characters");
-      return null;
-    }
-
-    if (cleanContactNumber.length > 30) {
-      toast.error("Contact number cannot exceed 30 characters");
-      return null;
-    }
-
-    const latitudeNumber = latitude === "" ? 0 : Number(latitude);
-    const longitudeNumber = longitude === "" ? 0 : Number(longitude);
-    const ratingNumber = rating === "" ? 0 : Number(rating);
-
-    if (
-      Number.isNaN(latitudeNumber) ||
-      latitudeNumber < -90 ||
-      latitudeNumber > 90
-    ) {
-      toast.error("Latitude must be between -90 and 90");
-      return null;
-    }
-
-    if (
-      Number.isNaN(longitudeNumber) ||
-      longitudeNumber < -180 ||
-      longitudeNumber > 180
-    ) {
-      toast.error("Longitude must be between -180 and 180");
-      return null;
-    }
-
-    if (
-      Number.isNaN(ratingNumber) ||
-      ratingNumber < 0 ||
-      ratingNumber > 5
-    ) {
-      toast.error("Rating must be between 0 and 5");
-      return null;
-    }
-
-    if (!Array.isArray(roomTypes) || roomTypes.length === 0) {
-      toast.error("At least one room type is required");
-      return null;
-    }
-
-    const normalizedRoomTypes = [];
-
-    for (let index = 0; index < roomTypes.length; index += 1) {
-      const room = roomTypes[index];
-      const roomName = room.name.trim();
-      const roomPrice = Number(room.pricePerNight);
-      const roomCapacity = Number(room.capacity);
-
-      if (!roomName) {
-        toast.error(`Room type ${index + 1}: name is required`);
-        return null;
-      }
-
-      if (roomName.length > 100) {
-        toast.error(
-          `Room type ${index + 1}: name cannot exceed 100 characters`
-        );
-        return null;
-      }
-
-      if (
-        room.pricePerNight === "" ||
-        Number.isNaN(roomPrice) ||
-        roomPrice < 0
-      ) {
-        toast.error(`Room type ${index + 1}: enter a valid price`);
-        return null;
-      }
-
-      if (
-        room.capacity === "" ||
-        Number.isNaN(roomCapacity) ||
-        roomCapacity < 1 ||
-        !Number.isInteger(roomCapacity)
-      ) {
-        toast.error(
-          `Room type ${index + 1}: capacity must be a whole number of at least 1`
-        );
-        return null;
-      }
-
-      normalizedRoomTypes.push({
-        name: roomName,
-        pricePerNight: roomPrice,
-        capacity: roomCapacity,
-      });
-    }
-
-    return {
-      ownerId: cleanOwnerId,
-      name: cleanName,
-      description: cleanDescription,
-      address: cleanAddress,
-      location: {
-        latitude: latitudeNumber,
-        longitude: longitudeNumber,
-      },
-      images: images.map((image) => image.trim()).filter(Boolean),
-      roomTypes: normalizedRoomTypes,
-      contactNumber: cleanContactNumber,
-      rating: ratingNumber,
-      isAvailable,
-      isApproved,
-    };
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-
-    const hotelPayload = validateAndBuildPayload();
-
-    if (!hotelPayload) {
-      return;
-    }
-
-    try {
-      setSaving(true);
-
-      if (editingHotel) {
-        await axios.put(
-          `${API_URL}/hotels/${editingHotel._id}`,
-          hotelPayload,
-          getAuthHeader()
-        );
-
-        toast.success("Hotel updated successfully");
-      } else {
-        await axios.post(`${API_URL}/hotels`, hotelPayload, getAuthHeader());
-        toast.success("Hotel added successfully");
-      }
-
-      resetForm();
-      await loadHotels();
-    } catch (error) {
-      console.error(error);
-      toast.error(getApiErrorMessage(error, "Failed to save hotel"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDeleteHotel(hotel) {
-    const confirmDelete = window.confirm(
-      `Are you sure you want to delete ${hotel.name || "this hotel"}?`
-    );
-
-    if (!confirmDelete) {
-      return;
-    }
-
-    try {
-      await axios.delete(`${API_URL}/hotels/${hotel._id}`, getAuthHeader());
-
-      toast.success("Hotel deleted successfully");
-      await loadHotels();
-    } catch (error) {
-      console.error(error);
-      toast.error(getApiErrorMessage(error, "Failed to delete hotel"));
-    }
-  }
+      return (
+        matchesSearch &&
+        matchesApproval &&
+        matchesAvailability
+      );
+    });
+  }, [
+    hotels,
+    searchText,
+    approvalFilter,
+    availabilityFilter,
+  ]);
 
   async function handleApprovalChange(hotel, newApprovalStatus) {
+    const action = newApprovalStatus ? "approve" : "reject";
+
+    const confirmed = window.confirm(
+      `Are you sure you want to ${action} ${
+        hotel.name || "this hotel"
+      }?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
+      setUpdatingHotelId(hotel._id);
+
       const endpoint = newApprovalStatus ? "approve" : "reject";
 
       try {
@@ -467,65 +159,79 @@ export default function AdminHotelsPage() {
           getAuthHeader()
         );
       } catch (specificRouteError) {
-        console.warn(
-          "Specific approval route failed. Trying the normal update route.",
-          specificRouteError
-        );
+        if (
+          specificRouteError?.response?.status !== 404 &&
+          specificRouteError?.response?.status !== 405
+        ) {
+          throw specificRouteError;
+        }
 
         await axios.put(
           `${API_URL}/hotels/${hotel._id}`,
-          { isApproved: newApprovalStatus },
+          {
+            isApproved: newApprovalStatus,
+          },
           getAuthHeader()
         );
       }
 
-      toast.success(newApprovalStatus ? "Hotel approved" : "Hotel rejected");
+      toast.success(
+        newApprovalStatus
+          ? "Hotel approved successfully"
+          : "Hotel rejected successfully"
+      );
+
+      setSelectedHotel(null);
       await loadHotels();
     } catch (error) {
-      console.error(error);
-      toast.error(getApiErrorMessage(error, "Failed to update approval"));
+      console.error("Hotel approval error:", error);
+      toast.error(
+        getApiErrorMessage(
+          error,
+          "Failed to update hotel approval"
+        )
+      );
+    } finally {
+      setUpdatingHotelId("");
     }
   }
 
-  async function handleAvailabilityChange(hotel, newAvailability) {
+  async function handleDeleteHotel(hotel) {
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete ${
+        hotel.name || "this hotel"
+      }?`
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
     try {
-      await axios.put(
+      setDeletingHotelId(hotel._id);
+
+      await axios.delete(
         `${API_URL}/hotels/${hotel._id}`,
-        { isAvailable: newAvailability },
         getAuthHeader()
       );
 
-      toast.success("Hotel availability updated");
+      toast.success("Hotel deleted successfully");
+      setSelectedHotel(null);
       await loadHotels();
     } catch (error) {
-      console.error(error);
-      toast.error(getApiErrorMessage(error, "Failed to update availability"));
-    }
-  }
-
-  function getOwnerDisplay(hotel) {
-    if (hotel.ownerId && typeof hotel.ownerId === "object") {
-      return (
-        hotel.ownerId.name ||
-        hotel.ownerId.email ||
-        hotel.ownerId._id ||
-        "Not added"
+      console.error("Delete hotel error:", error);
+      toast.error(
+        getApiErrorMessage(error, "Failed to delete hotel")
       );
+    } finally {
+      setDeletingHotelId("");
     }
-
-    return hotel.ownerId || hotel.owner?.name || "Not added";
   }
 
-  function getMinimumRoomPrice(hotel) {
-    if (!Array.isArray(hotel.roomTypes) || hotel.roomTypes.length === 0) {
-      return 0;
-    }
-
-    const prices = hotel.roomTypes
-      .map((room) => Number(room.pricePerNight))
-      .filter((price) => Number.isFinite(price) && price >= 0);
-
-    return prices.length > 0 ? Math.min(...prices) : 0;
+  function clearFilters() {
+    setSearchText("");
+    setApprovalFilter("all");
+    setAvailabilityFilter("all");
   }
 
   const totalHotels = hotels.length;
@@ -547,32 +253,24 @@ export default function AdminHotelsPage() {
           <h1 className="text-3xl font-bold text-accent">
             Hotels Management
           </h1>
+
           <p className="text-gray-500 mt-[5px]">
-            Add, update, approve, reject and manage hotels listed on Travel
-            Ease.
+            Review hotel-owner submissions and approve or reject
+            hotels before they appear publicly.
           </p>
         </div>
 
-        <div className="flex gap-[10px]">
-          <button
-            type="button"
-            onClick={loadHotels}
-            disabled={loading}
-            className="flex items-center gap-[8px] bg-white text-accent px-[18px] py-[10px] rounded-lg font-semibold border border-accent hover:bg-accent hover:text-white transition disabled:opacity-60"
-          >
-            <FiRefreshCw className={loading ? "animate-spin" : ""} />
-            Refresh
-          </button>
-
-          <button
-            type="button"
-            onClick={openAddForm}
-            className="flex items-center gap-[8px] bg-accent text-white px-[18px] py-[10px] rounded-lg font-semibold border border-accent hover:bg-transparent hover:text-accent transition"
-          >
-            <FaPlus />
-            Add Hotel
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={loadHotels}
+          disabled={loading}
+          className="w-fit flex items-center gap-[8px] bg-white text-accent px-[18px] py-[10px] rounded-lg font-semibold border border-accent hover:bg-accent hover:text-white transition disabled:opacity-60"
+        >
+          <FiRefreshCw
+            className={loading ? "animate-spin" : ""}
+          />
+          Refresh
+        </button>
       </div>
 
       {/* Statistics */}
@@ -606,301 +304,83 @@ export default function AdminHotelsPage() {
         />
       </div>
 
-      {/* Add and edit form */}
-      {showForm && (
-        <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px] mb-[25px]">
-          <div className="flex justify-between items-center mb-[20px]">
-            <div>
-              <h2 className="text-xl font-bold text-gray-800">
-                {editingHotel ? "Update Hotel" : "Add New Hotel"}
-              </h2>
-              <p className="text-sm text-gray-500">
-                Enter the hotel details that match your Hotel model.
-              </p>
-            </div>
-
-            <button
-              type="button"
-              onClick={resetForm}
-              className="px-[14px] py-[8px] rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300"
-            >
-              Close
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-              <InputField
-                label="Owner ID"
-                value={ownerId}
-                onChange={(e) => setOwnerId(e.target.value)}
-                placeholder="24-character MongoDB user ID"
-                maxLength={24}
-                required
-              />
-
-              <InputField
-                label="Hotel Name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Example: Ocean View Hotel"
-                minLength={2}
-                maxLength={150}
-                required
-              />
-
-              <InputField
-                label="Address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-                placeholder="Full hotel address"
-                maxLength={500}
-              />
-
-              <InputField
-                label="Contact Number"
-                value={contactNumber}
-                onChange={(e) => setContactNumber(e.target.value)}
-                placeholder="Example: 0771234567"
-                maxLength={30}
-              />
-
-              <InputField
-                label="Latitude"
-                type="number"
-                step="any"
-                min="-90"
-                max="90"
-                value={latitude}
-                onChange={(e) => setLatitude(e.target.value)}
-                placeholder="Example: 6.0329"
-              />
-
-              <InputField
-                label="Longitude"
-                type="number"
-                step="any"
-                min="-180"
-                max="180"
-                value={longitude}
-                onChange={(e) => setLongitude(e.target.value)}
-                placeholder="Example: 80.2168"
-              />
-
-              <InputField
-                label="Rating"
-                type="number"
-                min="0"
-                max="5"
-                step="0.1"
-                value={rating}
-                onChange={(e) => setRating(e.target.value)}
-                placeholder="Example: 4.5"
-              />
-
-              <div className="flex flex-col sm:flex-row gap-[20px] sm:items-center mt-[10px] md:mt-[28px]">
-                <label className="flex items-center gap-[10px] text-sm font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={isAvailable}
-                    onChange={(e) => setIsAvailable(e.target.checked)}
-                    className="w-[18px] h-[18px]"
-                  />
-                  Hotel Available
-                </label>
-
-                <label className="flex items-center gap-[10px] text-sm font-semibold text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={isApproved}
-                    onChange={(e) => setIsApproved(e.target.checked)}
-                    className="w-[18px] h-[18px]"
-                  />
-                  Admin Approved
-                </label>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
-                  Image URLs
-                </label>
-                <input
-                  type="text"
-                  value={images.join(", ")}
-                  onChange={handleImagesChange}
-                  placeholder="Paste image URLs separated by commas"
-                  className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <div className="flex justify-between items-center mb-[10px]">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700">
-                      Room Types
-                    </label>
-                    <p className="text-xs text-gray-400 mt-[3px]">
-                      Add the room name, price per night and guest capacity.
-                    </p>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={addRoomType}
-                    className="flex items-center gap-[6px] px-[12px] py-[8px] rounded-lg bg-accent text-white text-sm font-semibold"
-                  >
-                    <FaPlus />
-                    Add Room
-                  </button>
-                </div>
-
-                <div className="space-y-[12px]">
-                  {roomTypes.map((room, index) => (
-                    <div
-                      key={index}
-                      className="grid grid-cols-1 md:grid-cols-[1fr_1fr_1fr_auto] gap-[10px] items-end border border-gray-200 rounded-xl p-[12px]"
-                    >
-                      <InputField
-                        label={`Room Name ${index + 1}`}
-                        value={room.name}
-                        onChange={(e) =>
-                          handleRoomTypeChange(index, "name", e.target.value)
-                        }
-                        placeholder="Example: Deluxe Room"
-                        maxLength={100}
-                        required
-                      />
-
-                      <InputField
-                        label="Price Per Night"
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={room.pricePerNight}
-                        onChange={(e) =>
-                          handleRoomTypeChange(
-                            index,
-                            "pricePerNight",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Example: 12000"
-                        required
-                      />
-
-                      <InputField
-                        label="Capacity"
-                        type="number"
-                        min="1"
-                        step="1"
-                        value={room.capacity}
-                        onChange={(e) =>
-                          handleRoomTypeChange(index, "capacity", e.target.value)
-                        }
-                        placeholder="Example: 2"
-                        required
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => removeRoomType(index)}
-                        className="h-[45px] w-[45px] rounded-lg bg-red-600 hover:bg-red-700 text-white flex items-center justify-center"
-                        title="Remove room type"
-                      >
-                        <FaTrash />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
-                  Description
-                </label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Write hotel description"
-                  rows="4"
-                  minLength={10}
-                  maxLength={3000}
-                  required
-                  className="w-full border border-gray-300 rounded-lg px-[12px] py-[10px] focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-                <p className="text-xs text-gray-400 mt-[4px]">
-                  {description.length}/3000 characters
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-[10px] mt-[20px]">
-              <button
-                type="button"
-                onClick={resetForm}
-                disabled={saving}
-                className="px-[18px] py-[10px] rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300 disabled:opacity-60"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-[18px] py-[10px] rounded-lg bg-accent text-white font-semibold border border-accent hover:bg-transparent hover:text-accent transition disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {saving
-                  ? "Saving..."
-                  : editingHotel
-                    ? "Update Hotel"
-                    : "Save Hotel"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
       {/* Filters */}
       <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px] mb-[25px]">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-[15px]">
           <div className="relative">
             <FaSearch className="absolute top-[15px] left-[15px] text-gray-400" />
+
             <input
               type="text"
-              placeholder="Search by hotel, owner, address or contact number"
+              placeholder="Search hotel, owner, room type or address"
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
+              onChange={(event) =>
+                setSearchText(event.target.value)
+              }
               className="w-full h-[45px] border border-gray-300 rounded-lg pl-[40px] pr-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
 
           <select
             value={approvalFilter}
-            onChange={(e) => setApprovalFilter(e.target.value)}
+            onChange={(event) =>
+              setApprovalFilter(event.target.value)
+            }
             className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            <option value="all">All Approval Status</option>
-            <option value="approved">Approved Hotels</option>
-            <option value="pending">Pending Hotels</option>
+            <option value="all">
+              All Approval Status
+            </option>
+            <option value="pending">
+              Pending Hotels
+            </option>
+            <option value="approved">
+              Approved Hotels
+            </option>
           </select>
 
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
+            value={availabilityFilter}
+            onChange={(event) =>
+              setAvailabilityFilter(event.target.value)
+            }
             className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            <option value="all">All Availability</option>
-            <option value="available">Available Hotels</option>
-            <option value="unavailable">Unavailable Hotels</option>
+            <option value="all">
+              All Availability
+            </option>
+            <option value="available">
+              Available Hotels
+            </option>
+            <option value="unavailable">
+              Unavailable Hotels
+            </option>
           </select>
         </div>
+
+        {(searchText ||
+          approvalFilter !== "all" ||
+          availabilityFilter !== "all") && (
+          <div className="flex justify-end mt-[15px]">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="text-accent font-semibold hover:text-orange"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Hotels table */}
       <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px]">
         <div className="flex justify-between items-center mb-[20px]">
           <div>
-            <h2 className="text-xl font-bold text-gray-800">Hotels</h2>
+            <h2 className="text-xl font-bold text-gray-800">
+              Hotel Submissions
+            </h2>
+
             <p className="text-sm text-gray-500">
               Showing {filteredHotels.length} hotel(s)
             </p>
@@ -919,150 +399,193 @@ export default function AdminHotelsPage() {
                   <th className="py-[12px]">Hotel</th>
                   <th className="py-[12px]">Owner</th>
                   <th className="py-[12px]">Address</th>
-                  <th className="py-[12px]">Room Types</th>
-                  <th className="py-[12px]">Starting Price</th>
+                  <th className="py-[12px]">Rooms</th>
+                  <th className="py-[12px]">
+                    Starting Price
+                  </th>
                   <th className="py-[12px]">Rating</th>
                   <th className="py-[12px]">Approval</th>
-                  <th className="py-[12px]">Availability</th>
-                  <th className="py-[12px] text-center">Actions</th>
+                  <th className="py-[12px]">
+                    Availability
+                  </th>
+                  <th className="py-[12px] text-center">
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
-                {filteredHotels.map((hotel) => (
-                  <tr key={hotel._id} className="border-b text-sm">
-                    <td className="py-[14px]">
-                      <div className="flex items-center gap-[12px]">
-                        {hotel.images?.[0] ? (
-                          <img
-                            src={hotel.images[0]}
-                            alt={hotel.name || "Hotel"}
-                            className="w-[65px] h-[48px] rounded-lg object-cover border"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div className="w-[65px] h-[48px] rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400">
-                            <FaImage />
+                {filteredHotels.map((hotel) => {
+                  const isUpdating =
+                    updatingHotelId === hotel._id;
+                  const isDeleting =
+                    deletingHotelId === hotel._id;
+
+                  return (
+                    <tr
+                      key={hotel._id}
+                      className="border-b text-sm"
+                    >
+                      <td className="py-[14px]">
+                        <div className="flex items-center gap-[12px]">
+                          {getHotelImage(hotel) ? (
+                            <img
+                              src={getHotelImage(hotel)}
+                              alt={hotel.name || "Hotel"}
+                              onError={(event) => {
+                                event.currentTarget.onerror =
+                                  null;
+                                event.currentTarget.src =
+                                  "/hotel-placeholder.jpg";
+                              }}
+                              className="w-[65px] h-[48px] rounded-lg object-cover border"
+                            />
+                          ) : (
+                            <div className="w-[65px] h-[48px] rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400">
+                              <FaImage />
+                            </div>
+                          )}
+
+                          <div>
+                            <p className="font-bold text-gray-800">
+                              {hotel.name ||
+                                "Unnamed hotel"}
+                            </p>
+
+                            <p className="text-xs text-gray-400 line-clamp-1 max-w-[220px]">
+                              {hotel.contactNumber ||
+                                "No contact number"}
+                            </p>
                           </div>
-                        )}
-
-                        <div>
-                          <p className="font-bold text-gray-800">
-                            {hotel.name || "Unnamed hotel"}
-                          </p>
-                          <p className="text-xs text-gray-400 line-clamp-1 max-w-[220px]">
-                            {hotel.contactNumber || "No contact number"}
-                          </p>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="py-[14px] text-gray-600 max-w-[160px] break-all">
-                      {getOwnerDisplay(hotel)}
-                    </td>
+                      <td className="py-[14px] text-gray-600 max-w-[180px]">
+                        {getOwnerDisplay(hotel)}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600 max-w-[220px]">
-                      {hotel.address || "Not added"}
-                    </td>
+                      <td className="py-[14px] text-gray-600 max-w-[220px]">
+                        {hotel.address || "Not added"}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      {hotel.roomTypes?.length || 0}
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        {hotel.roomTypes?.length || 0}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      Rs. {getMinimumRoomPrice(hotel).toLocaleString()}
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        Rs.{" "}
+                        {getMinimumRoomPrice(
+                          hotel
+                        ).toLocaleString("en-LK")}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      <div className="flex items-center gap-[5px]">
-                        <FaStar className="text-orange" />
-                        {hotel.rating ?? 0}
-                      </div>
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        <div className="flex items-center gap-[5px]">
+                          <FaStar className="text-orange" />
+                          {Number(
+                            hotel.rating || 0
+                          ).toFixed(1)}
+                        </div>
+                      </td>
 
-                    <td className="py-[14px]">
-                      <span
-                        className={`px-[10px] py-[5px] rounded-full text-xs text-white ${
-                          hotel.isApproved ? "bg-green-600" : "bg-orange"
-                        }`}
-                      >
-                        {hotel.isApproved ? "Approved" : "Pending"}
-                      </span>
-                    </td>
+                      <td className="py-[14px]">
+                        <StatusBadge
+                          active={hotel.isApproved === true}
+                          activeText="Approved"
+                          inactiveText="Pending"
+                        />
+                      </td>
 
-                    <td className="py-[14px]">
-                      <select
-                        value={hotel.isAvailable === false ? "false" : "true"}
-                        onChange={(e) =>
-                          handleAvailabilityChange(
-                            hotel,
-                            e.target.value === "true"
-                          )
-                        }
-                        className={`px-[10px] py-[6px] rounded-lg text-xs text-white border-none outline-none ${
-                          hotel.isAvailable === false
-                            ? "bg-red-600"
-                            : "bg-green-600"
-                        }`}
-                      >
-                        <option value="true">Available</option>
-                        <option value="false">Unavailable</option>
-                      </select>
-                    </td>
+                      <td className="py-[14px]">
+                        <StatusBadge
+                          active={
+                            hotel.isAvailable !== false
+                          }
+                          activeText="Available"
+                          inactiveText="Unavailable"
+                        />
+                      </td>
 
-                    <td className="py-[14px]">
-                      <div className="flex justify-center gap-[8px]">
-                        {!hotel.isApproved && (
+                      <td className="py-[14px]">
+                        <div className="flex justify-center gap-[8px]">
                           <button
                             type="button"
-                            onClick={() => handleApprovalChange(hotel, true)}
-                            className="w-[35px] h-[35px] rounded-lg bg-green-600 hover:bg-green-700 flex items-center justify-center text-white"
-                            title="Approve Hotel"
+                            onClick={() =>
+                              setSelectedHotel(hotel)
+                            }
+                            disabled={
+                              isUpdating || isDeleting
+                            }
+                            className="w-[35px] h-[35px] rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white disabled:opacity-60"
+                            title="View Hotel Details"
                           >
-                            <FaCheckCircle />
+                            <FaEye />
                           </button>
-                        )}
 
-                        {hotel.isApproved && (
+                          {!hotel.isApproved && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleApprovalChange(
+                                  hotel,
+                                  true
+                                )
+                              }
+                              disabled={
+                                isUpdating ||
+                                isDeleting
+                              }
+                              className="w-[35px] h-[35px] rounded-lg bg-green-600 hover:bg-green-700 flex items-center justify-center text-white disabled:opacity-60"
+                              title="Approve Hotel"
+                            >
+                              <FaCheckCircle />
+                            </button>
+                          )}
+
+                          {hotel.isApproved && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleApprovalChange(
+                                  hotel,
+                                  false
+                                )
+                              }
+                              disabled={
+                                isUpdating ||
+                                isDeleting
+                              }
+                              className="w-[35px] h-[35px] rounded-lg bg-orange hover:bg-orange/80 flex items-center justify-center text-white disabled:opacity-60"
+                              title="Reject Hotel"
+                            >
+                              <FaTimesCircle />
+                            </button>
+                          )}
+
                           <button
                             type="button"
-                            onClick={() => handleApprovalChange(hotel, false)}
-                            className="w-[35px] h-[35px] rounded-lg bg-orange hover:bg-orange/80 flex items-center justify-center text-white"
-                            title="Reject Hotel"
+                            onClick={() =>
+                              handleDeleteHotel(hotel)
+                            }
+                            disabled={
+                              isUpdating || isDeleting
+                            }
+                            className="w-[35px] h-[35px] rounded-lg bg-red-600 hover:bg-red-700 flex items-center justify-center text-white disabled:opacity-60"
+                            title="Delete Hotel"
                           >
-                            <FaTimesCircle />
+                            <FaTrash />
                           </button>
-                        )}
-
-                        <button
-                          type="button"
-                          onClick={() => openEditForm(hotel)}
-                          className="w-[35px] h-[35px] rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white"
-                          title="Edit Hotel"
-                        >
-                          <FaEdit />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteHotel(hotel)}
-                          className="w-[35px] h-[35px] rounded-lg bg-red-600 hover:bg-red-700 flex items-center justify-center text-white"
-                          title="Delete Hotel"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {filteredHotels.length === 0 && (
                   <tr>
                     <td
                       colSpan="9"
-                      className="py-[30px] text-center text-gray-500"
+                      className="py-[35px] text-center text-gray-500"
                     >
                       No hotels found
                     </td>
@@ -1073,6 +596,259 @@ export default function AdminHotelsPage() {
           </div>
         )}
       </div>
+
+      {selectedHotel && (
+        <HotelDetailsModal
+          hotel={selectedHotel}
+          updatingHotelId={updatingHotelId}
+          deletingHotelId={deletingHotelId}
+          onClose={() => setSelectedHotel(null)}
+          onApprovalChange={handleApprovalChange}
+          onDelete={handleDeleteHotel}
+        />
+      )}
+    </div>
+  );
+}
+
+function HotelDetailsModal({
+  hotel,
+  updatingHotelId,
+  deletingHotelId,
+  onClose,
+  onApprovalChange,
+  onDelete,
+}) {
+  const isUpdating = updatingHotelId === hotel._id;
+  const isDeleting = deletingHotelId === hotel._id;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/60 p-[20px] flex items-center justify-center">
+      <div className="w-full max-w-[900px] max-h-[90vh] overflow-y-auto bg-white rounded-2xl shadow-2xl">
+        <div className="sticky top-0 bg-white border-b px-[20px] py-[15px] flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-800">
+              {hotel.name || "Hotel Details"}
+            </h2>
+
+            <p className="text-sm text-gray-500">
+              Review the complete hotel submission.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-[38px] h-[38px] rounded-lg bg-gray-200 text-gray-700 flex items-center justify-center hover:bg-gray-300"
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="p-[20px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-[20px]">
+            <div>
+              <HotelImageGallery hotel={hotel} />
+            </div>
+
+            <div className="space-y-[12px]">
+              <DetailRow
+                label="Owner"
+                value={getOwnerDisplay(hotel)}
+              />
+
+              <DetailRow
+                label="Contact"
+                value={
+                  hotel.contactNumber || "Not added"
+                }
+              />
+
+              <DetailRow
+                label="Address"
+                value={hotel.address || "Not added"}
+              />
+
+              <DetailRow
+                label="Coordinates"
+                value={formatCoordinates(
+                  hotel.location
+                )}
+              />
+
+              <DetailRow
+                label="Rating"
+                value={`${Number(
+                  hotel.rating || 0
+                ).toFixed(1)} / 5`}
+              />
+
+              <div className="flex flex-wrap gap-[8px]">
+                <StatusBadge
+                  active={hotel.isApproved === true}
+                  activeText="Approved"
+                  inactiveText="Pending"
+                />
+
+                <StatusBadge
+                  active={hotel.isAvailable !== false}
+                  activeText="Available"
+                  inactiveText="Unavailable"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-[20px]">
+            <h3 className="font-bold text-gray-800 mb-[8px]">
+              Description
+            </h3>
+
+            <p className="text-gray-600 leading-7 whitespace-pre-wrap">
+              {hotel.description ||
+                "No description provided."}
+            </p>
+          </div>
+
+          <div className="mt-[20px]">
+            <h3 className="font-bold text-gray-800 mb-[10px]">
+              Room Types
+            </h3>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left min-w-[600px]">
+                <thead>
+                  <tr className="border-b text-sm text-gray-500">
+                    <th className="py-[10px]">
+                      Room Name
+                    </th>
+                    <th className="py-[10px]">
+                      Price Per Night
+                    </th>
+                    <th className="py-[10px]">
+                      Capacity
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {(hotel.roomTypes || []).map(
+                    (room, index) => (
+                      <tr
+                        key={`${room.name}-${index}`}
+                        className="border-b text-sm"
+                      >
+                        <td className="py-[10px]">
+                          {room.name || "Unnamed room"}
+                        </td>
+
+                        <td className="py-[10px]">
+                          Rs.{" "}
+                          {Number(
+                            room.pricePerNight || 0
+                          ).toLocaleString("en-LK")}
+                        </td>
+
+                        <td className="py-[10px]">
+                          {room.capacity || 0} guest(s)
+                        </td>
+                      </tr>
+                    )
+                  )}
+
+                  {!hotel.roomTypes?.length && (
+                    <tr>
+                      <td
+                        colSpan="3"
+                        className="py-[20px] text-center text-gray-500"
+                      >
+                        No room types provided
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap justify-end gap-[10px] mt-[25px]">
+            <button
+              type="button"
+              onClick={() => onDelete(hotel)}
+              disabled={isUpdating || isDeleting}
+              className="px-[18px] py-[10px] rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-60"
+            >
+              Delete Hotel
+            </button>
+
+            {hotel.isApproved ? (
+              <button
+                type="button"
+                onClick={() =>
+                  onApprovalChange(hotel, false)
+                }
+                disabled={isUpdating || isDeleting}
+                className="px-[18px] py-[10px] rounded-lg bg-orange text-white font-semibold hover:bg-orange/80 disabled:opacity-60"
+              >
+                Reject Hotel
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() =>
+                  onApprovalChange(hotel, true)
+                }
+                disabled={isUpdating || isDeleting}
+                className="px-[18px] py-[10px] rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-60"
+              >
+                Approve Hotel
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function HotelImageGallery({ hotel }) {
+  const images = Array.isArray(hotel.images)
+    ? hotel.images.filter(Boolean)
+    : [];
+
+  if (images.length === 0) {
+    return (
+      <div className="w-full h-[260px] rounded-xl bg-gray-100 border flex items-center justify-center text-gray-400 text-5xl">
+        <FaImage />
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <img
+        src={normalizeImageUrl(images[0])}
+        alt={hotel.name || "Hotel"}
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src =
+            "/hotel-placeholder.jpg";
+        }}
+        className="w-full h-[260px] rounded-xl object-cover border"
+      />
+
+      {images.length > 1 && (
+        <div className="grid grid-cols-3 gap-[8px] mt-[8px]">
+          {images.slice(1, 4).map((image, index) => (
+            <img
+              key={`${image}-${index}`}
+              src={normalizeImageUrl(image)}
+              alt={`${hotel.name || "Hotel"} ${index + 2}`}
+              className="w-full h-[80px] rounded-lg object-cover border"
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -1082,7 +858,10 @@ function HotelStatCard({ title, value, icon, color }) {
     <div className="bg-white border border-gray-200 rounded-2xl shadow-md p-[20px] flex justify-between items-center">
       <div>
         <p className="text-gray-500 text-sm">{title}</p>
-        <h2 className="text-3xl font-bold text-gray-800 mt-[6px]">{value}</h2>
+
+        <h2 className="text-3xl font-bold text-gray-800 mt-[6px]">
+          {value}
+        </h2>
       </div>
 
       <div
@@ -1094,38 +873,109 @@ function HotelStatCard({ title, value, icon, color }) {
   );
 }
 
-function InputField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  min,
-  max,
-  step,
-  minLength,
-  maxLength,
-  required = false,
+function StatusBadge({
+  active,
+  activeText,
+  inactiveText,
 }) {
   return (
-    <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
-        {label}
-      </label>
+    <span
+      className={`inline-flex px-[10px] py-[5px] rounded-full text-xs text-white ${
+        active ? "bg-green-600" : "bg-orange"
+      }`}
+    >
+      {active ? activeText : inactiveText}
+    </span>
+  );
+}
 
-      <input
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        min={min}
-        max={max}
-        step={step}
-        minLength={minLength}
-        maxLength={maxLength}
-        required={required}
-        className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
-      />
+function DetailRow({ label, value }) {
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
+        {label}
+      </p>
+
+      <p className="text-gray-700 mt-[2px] break-words">
+        {value}
+      </p>
     </div>
   );
+}
+
+function getOwnerDisplay(hotel) {
+  if (hotel.ownerId && typeof hotel.ownerId === "object") {
+    return (
+      hotel.ownerId.name ||
+      hotel.ownerId.email ||
+      hotel.ownerId._id ||
+      "Not added"
+    );
+  }
+
+  return hotel.ownerId || hotel.owner?.name || "Not added";
+}
+
+function getMinimumRoomPrice(hotel) {
+  if (!Array.isArray(hotel.roomTypes)) {
+    return 0;
+  }
+
+  const prices = hotel.roomTypes
+    .map((room) => Number(room.pricePerNight))
+    .filter(
+      (price) =>
+        Number.isFinite(price) && price >= 0
+    );
+
+  return prices.length > 0 ? Math.min(...prices) : 0;
+}
+
+function formatCoordinates(location) {
+  const latitude = Number(location?.latitude);
+  const longitude = Number(location?.longitude);
+
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    (latitude === 0 && longitude === 0)
+  ) {
+    return "Not added";
+  }
+
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(
+    6
+  )}`;
+}
+
+function normalizeImageUrl(image) {
+  const imageText = String(image || "").trim();
+
+  if (!imageText) {
+    return "";
+  }
+
+  if (
+    imageText.startsWith("http://") ||
+    imageText.startsWith("https://") ||
+    imageText.startsWith("data:")
+  ) {
+    return imageText;
+  }
+
+  const backendOrigin = API_URL.replace(/\/api\/?$/, "");
+
+  if (imageText.startsWith("/")) {
+    return `${backendOrigin}${imageText}`;
+  }
+
+  return `${backendOrigin}/${imageText}`;
+}
+
+function getHotelImage(hotel) {
+  const firstImage = Array.isArray(hotel.images)
+    ? hotel.images.find(Boolean)
+    : "";
+
+  return normalizeImageUrl(firstImage);
 }

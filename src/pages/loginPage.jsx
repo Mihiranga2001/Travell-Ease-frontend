@@ -11,37 +11,52 @@ export default function LoginPage() {
     const[password,setPassword] = useState("")
     const navigate = useNavigate()//use to smooth webpage go another web page
 
-    async function login(){
-        console.log("Email: ",email);
-        console.log("Password: ",password);
+    async function login(event) {
+  event?.preventDefault();
 
-        try{
-            const res = await axios.post(import.meta.env.VITE_BACKEND_URL + "/users/login",{
-                email : email,
-                password : password,
-            })
+  if (!email.trim() || !password.trim()) {
+    toast.error("Please enter your email and password");
+    return;
+  }
 
-            console.log(res);
+  try {
+    const response = await axios.post(
+      `${import.meta.env.VITE_BACKEND_URL}/users/login`,
+      {
+        email: email.trim(),
+        password,
+      }
+    );
 
-            localStorage.setItem("token",res.data.token);
+    const token = response.data.token;
+    const user = response.data.user;
 
-            if(res.data.role == "admin"){
-                //window.location.href = "/admin"
-                navigate("/admin")
-            }else{
-                //window.location.href = "/"
-                navigate("/")
-            }
-            //alert("Login Successfull");
-            toast.success("Login Successfull");
-
-        }catch(err){
-            //alert("Login Failed");
-            toast.error("Login Failed");
-            console.log(err)
-        }
-
+    if (!token || !user) {
+      toast.error("Invalid login response");
+      return;
     }
+
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(user));
+    localStorage.setItem("role", user.role);
+
+    toast.success("Login successful");
+
+    if (user.role === "admin") {
+      navigate("/admin", { replace: true });
+    } else if (user.role === "hotel_owner") {
+      navigate("/hotel-Owner", { replace: true });
+    } else {
+      navigate("/", { replace: true });
+    }
+  } catch (error) {
+    console.error("Login error:", error);
+
+    toast.error(
+      error.response?.data?.message || "Login failed"
+    );
+  }
+}
 
     return (
         <div className="w-full h-screen bg-[url(/bg.jpg)] bg-center bg-cover bg-no-repeat flex">
