@@ -1,60 +1,43 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import axios from "axios";
 import toast from "react-hot-toast";
 import {
   FaCar,
-  FaPlus,
-  FaEdit,
-  FaTrash,
-  FaSearch,
-  FaStar,
-  FaImage,
   FaCheckCircle,
+  FaEye,
+  FaImage,
+  FaSearch,
+  FaTimes,
   FaTimesCircle,
+  FaTrash,
 } from "react-icons/fa";
 import { FiRefreshCw } from "react-icons/fi";
 
-const API_URL = "http://localhost:3000/api";
+const API_URL =
+  import.meta.env.VITE_BACKEND_URL ||
+  import.meta.env.VITE_API_URL ||
+  "http://localhost:3000/api";
 
 export default function AdminVehiclesPage() {
   const [vehicles, setVehicles] = useState([]);
-  const [filteredVehicles, setFilteredVehicles] = useState([]);
-
   const [loading, setLoading] = useState(true);
+  const [updatingId, setUpdatingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
+
   const [searchText, setSearchText] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [approvalFilter, setApprovalFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [availabilityFilter, setAvailabilityFilter] =
+    useState("all");
 
-  const [showForm, setShowForm] = useState(false);
-  const [editingVehicle, setEditingVehicle] = useState(null);
+  const [selectedVehicle, setSelectedVehicle] = useState(null);
 
-  const [formData, setFormData] = useState({
-    name: "",
-    brand: "",
-    model: "",
-    vehicleType: "car",
-    companyName: "",
-    email: "",
-    phoneNumber: "",
-    city: "",
-    district: "",
-    province: "",
-    address: "",
-    latitude: "",
-    longitude: "",
-    pricePerDay: "",
-    seats: "",
-    fuelType: "petrol",
-    transmission: "manual",
-    description: "",
-    images: "",
-    status: "active",
-    isApproved: false,
-  });
-
-  function getAuthHeader() {
+  function getAuthConfig() {
     const token = localStorage.getItem("token");
+
+    if (!token) {
+      throw new Error("Please log in again");
+    }
 
     return {
       headers: {
@@ -63,30 +46,38 @@ export default function AdminVehiclesPage() {
     };
   }
 
+  function getErrorMessage(error, fallback) {
+    return (
+      error?.response?.data?.message ||
+      error?.response?.data?.error ||
+      error?.message ||
+      fallback
+    );
+  }
+
   async function loadVehicles() {
     try {
       setLoading(true);
 
-      let response;
+      const response = await axios.get(
+        `${API_URL}/vehicles/admin/all`,
+        getAuthConfig()
+      );
 
-      try {
-        response = await axios.get(
-          `${API_URL}/vehicles/admin/all`,
-          getAuthHeader()
-        );
-      } catch {
-        response = await axios.get(`${API_URL}/vehicles`, getAuthHeader());
-      }
-
-      const vehicleList = Array.isArray(response.data)
+      const list = Array.isArray(response.data)
         ? response.data
-        : response.data.vehicles || response.data.data || [];
+        : response.data?.vehicles ||
+          response.data?.data ||
+          response.data?.results ||
+          [];
 
-      setVehicles(vehicleList);
-      setFilteredVehicles(vehicleList);
+      setVehicles(list);
     } catch (error) {
-      console.error(error);
-      toast.error(error.response?.data?.message || "Failed to load vehicles");
+      console.error("Load vehicles error:", error);
+      setVehicles([]);
+      toast.error(
+        getErrorMessage(error, "Failed to load vehicles")
+      );
     } finally {
       setLoading(false);
     }
@@ -96,825 +87,439 @@ export default function AdminVehiclesPage() {
     loadVehicles();
   }, []);
 
-  useEffect(() => {
-    let result = [...vehicles];
+  const filteredVehicles = useMemo(() => {
+    const search = searchText.trim().toLowerCase();
 
-    if (searchText.trim() !== "") {
-      const search = searchText.toLowerCase();
+    return vehicles.filter((vehicle) => {
+      const company = getCompanyName(vehicle);
 
-      result = result.filter(
-        (vehicle) =>
-          vehicle.name?.toLowerCase().includes(search) ||
-          vehicle.vehicleName?.toLowerCase().includes(search) ||
-          vehicle.brand?.toLowerCase().includes(search) ||
-          vehicle.model?.toLowerCase().includes(search) ||
-          vehicle.companyName?.toLowerCase().includes(search) ||
-          vehicle.city?.toLowerCase().includes(search) ||
-          vehicle.district?.toLowerCase().includes(search)
+      const matchesSearch =
+        !search ||
+        String(vehicle.model || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(vehicle.type || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(company).toLowerCase().includes(search);
+
+      const matchesType =
+        typeFilter === "all" ||
+        vehicle.type === typeFilter;
+
+      const matchesApproval =
+        approvalFilter === "all" ||
+        (approvalFilter === "approved" &&
+          vehicle.isApproved === true) ||
+        (approvalFilter === "pending" &&
+          vehicle.isApproved !== true);
+
+      const matchesAvailability =
+        availabilityFilter === "all" ||
+        (availabilityFilter === "available" &&
+          vehicle.isAvailable !== false) ||
+        (availabilityFilter === "unavailable" &&
+          vehicle.isAvailable === false);
+
+      return (
+        matchesSearch &&
+        matchesType &&
+        matchesApproval &&
+        matchesAvailability
       );
-    }
-
-    if (typeFilter !== "all") {
-      result = result.filter(
-        (vehicle) =>
-          vehicle.vehicleType === typeFilter || vehicle.type === typeFilter
-      );
-    }
-
-    if (approvalFilter !== "all") {
-      if (approvalFilter === "approved") {
-        result = result.filter((vehicle) => vehicle.isApproved === true);
-      }
-
-      if (approvalFilter === "pending") {
-        result = result.filter((vehicle) => vehicle.isApproved === false);
-      }
-    }
-
-    if (statusFilter !== "all") {
-      result = result.filter((vehicle) => {
-        const status = vehicle.status || "active";
-        return status === statusFilter;
-      });
-    }
-
-    setFilteredVehicles(result);
-  }, [searchText, typeFilter, approvalFilter, statusFilter, vehicles]);
-
-  function resetForm() {
-    setFormData({
-      name: "",
-      brand: "",
-      model: "",
-      vehicleType: "car",
-      companyName: "",
-      email: "",
-      phoneNumber: "",
-      city: "",
-      district: "",
-      province: "",
-      address: "",
-      latitude: "",
-      longitude: "",
-      pricePerDay: "",
-      seats: "",
-      fuelType: "petrol",
-      transmission: "manual",
-      description: "",
-      images: "",
-      status: "active",
-      isApproved: false,
     });
+  }, [
+    vehicles,
+    searchText,
+    typeFilter,
+    approvalFilter,
+    availabilityFilter,
+  ]);
 
-    setEditingVehicle(null);
-    setShowForm(false);
-  }
+  async function changeApproval(vehicle, shouldApprove) {
+    const action = shouldApprove ? "approve" : "reject";
 
-  function openAddForm() {
-    resetForm();
-    setShowForm(true);
-  }
+    const confirmed = window.confirm(
+      `Are you sure you want to ${action} ${
+        vehicle.model || "this vehicle"
+      }?`
+    );
 
-  function openEditForm(vehicle) {
-    setEditingVehicle(vehicle);
-
-    setFormData({
-      name: vehicle.name || vehicle.vehicleName || "",
-      brand: vehicle.brand || "",
-      model: vehicle.model || "",
-      vehicleType: vehicle.vehicleType || vehicle.type || "car",
-      companyName: vehicle.companyName || vehicle.owner?.name || "",
-      email: vehicle.email || vehicle.contactEmail || "",
-      phoneNumber: vehicle.phoneNumber || vehicle.contactNumber || "",
-      city: vehicle.city || "",
-      district: vehicle.district || "",
-      province: vehicle.province || "",
-      address: vehicle.address || vehicle.location?.address || "",
-      latitude:
-        vehicle.latitude ||
-        vehicle.location?.coordinates?.[1] ||
-        vehicle.coordinates?.lat ||
-        "",
-      longitude:
-        vehicle.longitude ||
-        vehicle.location?.coordinates?.[0] ||
-        vehicle.coordinates?.lng ||
-        "",
-      pricePerDay: vehicle.pricePerDay || vehicle.price || "",
-      seats: vehicle.seats || vehicle.capacity || "",
-      fuelType: vehicle.fuelType || "petrol",
-      transmission: vehicle.transmission || "manual",
-      description: vehicle.description || "",
-      images: Array.isArray(vehicle.images) ? vehicle.images.join(", ") : "",
-      status: vehicle.status || "active",
-      isApproved: vehicle.isApproved || false,
-    });
-
-    setShowForm(true);
-  }
-
-  function handleInputChange(e) {
-    const { name, value, type, checked } = e.target;
-
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === "checkbox" ? checked : value,
-    }));
-  }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
+    if (!confirmed) return;
 
     try {
-      if (!formData.name.trim()) {
-        toast.error("Vehicle name is required");
-        return;
-      }
+      setUpdatingId(vehicle._id);
 
-      if (!formData.companyName.trim()) {
-        toast.error("Company name is required");
-        return;
-      }
+      await axios.put(
+        `${API_URL}/vehicles/${vehicle._id}/${
+          shouldApprove ? "approve" : "reject"
+        }`,
+        {},
+        getAuthConfig()
+      );
 
-      if (!formData.city.trim()) {
-        toast.error("City is required");
-        return;
-      }
+      toast.success(
+        shouldApprove
+          ? "Vehicle approved successfully"
+          : "Vehicle rejected successfully"
+      );
 
-      const vehiclePayload = {
-        name: formData.name,
-        vehicleName: formData.name,
-        brand: formData.brand,
-        model: formData.model,
-        vehicleType: formData.vehicleType,
-        type: formData.vehicleType,
-        companyName: formData.companyName,
-        email: formData.email,
-        contactEmail: formData.email,
-        phoneNumber: formData.phoneNumber,
-        contactNumber: formData.phoneNumber,
-        city: formData.city,
-        district: formData.district,
-        province: formData.province,
-        address: formData.address,
-        latitude: Number(formData.latitude) || 0,
-        longitude: Number(formData.longitude) || 0,
-        pricePerDay: Number(formData.pricePerDay) || 0,
-        price: Number(formData.pricePerDay) || 0,
-        seats: Number(formData.seats) || 0,
-        capacity: Number(formData.seats) || 0,
-        fuelType: formData.fuelType,
-        transmission: formData.transmission,
-        description: formData.description,
-        images: formData.images
-          .split(",")
-          .map((image) => image.trim())
-          .filter((image) => image !== ""),
-        status: formData.status,
-        isApproved: formData.isApproved,
-        location: {
-          type: "Point",
-          coordinates: [
-            Number(formData.longitude) || 0,
-            Number(formData.latitude) || 0,
-          ],
-          address: formData.address,
-        },
-      };
-
-      if (editingVehicle) {
-        await axios.put(
-          `${API_URL}/vehicles/${editingVehicle._id}`,
-          vehiclePayload,
-          getAuthHeader()
-        );
-
-        toast.success("Vehicle updated successfully");
-      } else {
-        await axios.post(`${API_URL}/vehicles`, vehiclePayload, getAuthHeader());
-
-        toast.success("Vehicle added successfully");
-      }
-
-      resetForm();
-      loadVehicles();
+      setSelectedVehicle(null);
+      await loadVehicles();
     } catch (error) {
-      console.error(error);
-      toast.error(error.response?.data?.message || "Failed to save vehicle");
+      console.error("Approval update error:", error);
+      toast.error(
+        getErrorMessage(
+          error,
+          "Failed to update vehicle approval"
+        )
+      );
+    } finally {
+      setUpdatingId("");
     }
   }
 
-  async function handleDeleteVehicle(vehicle) {
+  async function deleteVehicle(vehicle) {
+    const confirmed = window.confirm(
+      `Are you sure you want to permanently delete ${
+        vehicle.model || "this vehicle"
+      }?`
+    );
+
+    if (!confirmed) return;
+
     try {
-      const vehicleName =
-        vehicle.name || vehicle.vehicleName || vehicle.model || "this vehicle";
+      setDeletingId(vehicle._id);
 
-      const confirmDelete = window.confirm(
-        `Are you sure you want to delete ${vehicleName}?`
+      await axios.delete(
+        `${API_URL}/vehicles/${vehicle._id}`,
+        getAuthConfig()
       );
-
-      if (!confirmDelete) return;
-
-      await axios.delete(`${API_URL}/vehicles/${vehicle._id}`, getAuthHeader());
 
       toast.success("Vehicle deleted successfully");
-      loadVehicles();
+      setSelectedVehicle(null);
+      await loadVehicles();
     } catch (error) {
-      console.error(error);
-      toast.error(error.response?.data?.message || "Failed to delete vehicle");
-    }
-  }
-
-  async function handleApprovalChange(vehicle, isApproved) {
-    try {
-      const endpoint = isApproved ? "approve" : "reject";
-
-      try {
-        await axios.put(
-          `${API_URL}/vehicles/${vehicle._id}/${endpoint}`,
-          {},
-          getAuthHeader()
-        );
-      } catch {
-        await axios.put(
-          `${API_URL}/vehicles/${vehicle._id}`,
-          {
-            isApproved,
-            approvalStatus: isApproved ? "approved" : "rejected",
-          },
-          getAuthHeader()
-        );
-      }
-
-      toast.success(isApproved ? "Vehicle approved" : "Vehicle rejected");
-      loadVehicles();
-    } catch (error) {
-      console.error(error);
-      toast.error(error.response?.data?.message || "Failed to update approval");
-    }
-  }
-
-  async function handleStatusChange(vehicle, newStatus) {
-    try {
-      await axios.put(
-        `${API_URL}/vehicles/${vehicle._id}`,
-        {
-          status: newStatus,
-          isActive: newStatus === "active",
-        },
-        getAuthHeader()
+      console.error("Delete vehicle error:", error);
+      toast.error(
+        getErrorMessage(error, "Failed to delete vehicle")
       );
-
-      toast.success("Vehicle status updated");
-      loadVehicles();
-    } catch (error) {
-      console.error(error);
-      toast.error(error.response?.data?.message || "Failed to update status");
+    } finally {
+      setDeletingId("");
     }
   }
 
-  const totalVehicles = vehicles.length;
-  const approvedVehicles = vehicles.filter(
+  function clearFilters() {
+    setSearchText("");
+    setTypeFilter("all");
+    setApprovalFilter("all");
+    setAvailabilityFilter("all");
+  }
+
+  const total = vehicles.length;
+  const approved = vehicles.filter(
     (vehicle) => vehicle.isApproved === true
   ).length;
-  const pendingVehicles = vehicles.filter(
-    (vehicle) => vehicle.isApproved === false
+  const pending = vehicles.filter(
+    (vehicle) => vehicle.isApproved !== true
   ).length;
-  const activeVehicles = vehicles.filter(
-    (vehicle) => (vehicle.status || "active") === "active"
+  const available = vehicles.filter(
+    (vehicle) => vehicle.isAvailable !== false
   ).length;
 
   return (
-    <div className="w-full min-h-screen bg-white p-[25px] text-gray-800 overflow-y-auto">
-      {/* Header */}
-      <div className="w-full flex flex-col lg:flex-row lg:items-center lg:justify-between gap-[15px] mb-[25px]">
+    <div className="min-h-screen w-full overflow-y-auto bg-white p-[25px] text-gray-800">
+      <div className="mb-[25px] flex flex-col gap-[15px] lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h1 className="text-3xl font-bold text-accent">
-            Vehicles Management
+            Vehicle Management
           </h1>
-          <p className="text-gray-500 mt-[5px]">
-            Add, update, approve, reject and manage vehicle rentals on Travel
-            Ease.
+
+          <p className="mt-[5px] text-gray-500">
+            Review vehicle-company submissions and manage approval.
           </p>
         </div>
 
-        <div className="flex gap-[10px]">
-          <button
-            onClick={loadVehicles}
-            className="flex items-center gap-[8px] bg-white text-accent px-[18px] py-[10px] rounded-lg font-semibold border border-accent hover:bg-accent hover:text-white transition"
-          >
-            <FiRefreshCw />
-            Refresh
-          </button>
-
-          <button
-            onClick={openAddForm}
-            className="flex items-center gap-[8px] bg-accent text-white px-[18px] py-[10px] rounded-lg font-semibold border border-accent hover:bg-transparent hover:text-accent transition"
-          >
-            <FaPlus />
-            Add Vehicle
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={loadVehicles}
+          disabled={loading}
+          className="flex w-fit items-center gap-[8px] rounded-lg border border-accent bg-white px-[18px] py-[10px] font-semibold text-accent transition hover:bg-accent hover:text-white disabled:opacity-60"
+        >
+          <FiRefreshCw
+            className={loading ? "animate-spin" : ""}
+          />
+          Refresh
+        </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-[20px] mb-[25px]">
-        <VehicleStatCard
+      <div className="mb-[25px] grid grid-cols-1 gap-[20px] sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
           title="Total Vehicles"
-          value={totalVehicles}
+          value={total}
           icon={<FaCar />}
           color="bg-blue-600"
         />
-
-        <VehicleStatCard
+        <StatCard
           title="Approved Vehicles"
-          value={approvedVehicles}
+          value={approved}
           icon={<FaCheckCircle />}
           color="bg-green-600"
         />
-
-        <VehicleStatCard
+        <StatCard
           title="Pending Vehicles"
-          value={pendingVehicles}
+          value={pending}
           icon={<FaTimesCircle />}
           color="bg-orange"
         />
-
-        <VehicleStatCard
-          title="Active Vehicles"
-          value={activeVehicles}
+        <StatCard
+          title="Available Vehicles"
+          value={available}
           icon={<FaCar />}
           color="bg-purple-600"
         />
       </div>
 
-      {/* Add / Edit Form */}
-      {showForm && (
-        <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px] mb-[25px]">
-          <div className="flex justify-between items-center mb-[20px]">
-            <div>
-              <h2 className="text-xl font-bold text-gray-800">
-                {editingVehicle ? "Update Vehicle" : "Add New Vehicle"}
-              </h2>
-              <p className="text-sm text-gray-500">
-                Enter vehicle, rental company, price, location and image
-                details.
-              </p>
-            </div>
-
-            <button
-              onClick={resetForm}
-              className="px-[14px] py-[8px] rounded-lg bg-gray-200 text-gray-700 hover:bg-gray-300"
-            >
-              Close
-            </button>
-          </div>
-
-          <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-[15px]">
-              <InputField
-                label="Vehicle Name"
-                name="name"
-                value={formData.name}
-                onChange={handleInputChange}
-                placeholder="Example: Toyota KDH Van"
-              />
-
-              <SelectField
-                label="Vehicle Type"
-                name="vehicleType"
-                value={formData.vehicleType}
-                onChange={handleInputChange}
-                options={[
-                  { value: "bike", label: "Bike" },
-                  { value: "car", label: "Car" },
-                  { value: "van", label: "Van" },
-                  { value: "suv", label: "SUV" },
-                  { value: "bus", label: "Bus" },
-                  { value: "tuk", label: "Tuk Tuk" },
-                  { value: "other", label: "Other" },
-                ]}
-              />
-
-              <InputField
-                label="Brand"
-                name="brand"
-                value={formData.brand}
-                onChange={handleInputChange}
-                placeholder="Example: Toyota"
-              />
-
-              <InputField
-                label="Model"
-                name="model"
-                value={formData.model}
-                onChange={handleInputChange}
-                placeholder="Example: KDH"
-              />
-
-              <InputField
-                label="Company Name"
-                name="companyName"
-                value={formData.companyName}
-                onChange={handleInputChange}
-                placeholder="Example: Travel Rent Lanka"
-              />
-
-              <InputField
-                label="Email"
-                name="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                placeholder="company@example.com"
-              />
-
-              <InputField
-                label="Phone Number"
-                name="phoneNumber"
-                value={formData.phoneNumber}
-                onChange={handleInputChange}
-                placeholder="0771234567"
-              />
-
-              <InputField
-                label="City"
-                name="city"
-                value={formData.city}
-                onChange={handleInputChange}
-                placeholder="Example: Colombo"
-              />
-
-              <InputField
-                label="District"
-                name="district"
-                value={formData.district}
-                onChange={handleInputChange}
-                placeholder="Example: Colombo"
-              />
-
-              <InputField
-                label="Province"
-                name="province"
-                value={formData.province}
-                onChange={handleInputChange}
-                placeholder="Example: Western Province"
-              />
-
-              <InputField
-                label="Address"
-                name="address"
-                value={formData.address}
-                onChange={handleInputChange}
-                placeholder="Full address"
-              />
-
-              <InputField
-                label="Latitude"
-                name="latitude"
-                value={formData.latitude}
-                onChange={handleInputChange}
-                placeholder="Example: 6.9271"
-              />
-
-              <InputField
-                label="Longitude"
-                name="longitude"
-                value={formData.longitude}
-                onChange={handleInputChange}
-                placeholder="Example: 79.8612"
-              />
-
-              <InputField
-                label="Price Per Day"
-                name="pricePerDay"
-                value={formData.pricePerDay}
-                onChange={handleInputChange}
-                placeholder="Example: 15000"
-              />
-
-              <InputField
-                label="Seats"
-                name="seats"
-                value={formData.seats}
-                onChange={handleInputChange}
-                placeholder="Example: 4"
-              />
-
-              <SelectField
-                label="Fuel Type"
-                name="fuelType"
-                value={formData.fuelType}
-                onChange={handleInputChange}
-                options={[
-                  { value: "petrol", label: "Petrol" },
-                  { value: "diesel", label: "Diesel" },
-                  { value: "hybrid", label: "Hybrid" },
-                  { value: "electric", label: "Electric" },
-                ]}
-              />
-
-              <SelectField
-                label="Transmission"
-                name="transmission"
-                value={formData.transmission}
-                onChange={handleInputChange}
-                options={[
-                  { value: "manual", label: "Manual" },
-                  { value: "automatic", label: "Automatic" },
-                ]}
-              />
-
-              <SelectField
-                label="Status"
-                name="status"
-                value={formData.status}
-                onChange={handleInputChange}
-                options={[
-                  { value: "active", label: "Active" },
-                  { value: "inactive", label: "Inactive" },
-                ]}
-              />
-
-              <div className="flex items-center gap-[10px] mt-[28px]">
-                <input
-                  type="checkbox"
-                  name="isApproved"
-                  checked={formData.isApproved}
-                  onChange={handleInputChange}
-                  className="w-[18px] h-[18px]"
-                />
-                <label className="text-sm font-semibold text-gray-700">
-                  Admin Approved
-                </label>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
-                  Image URLs
-                </label>
-                <input
-                  type="text"
-                  name="images"
-                  value={formData.images}
-                  onChange={handleInputChange}
-                  placeholder="Paste image URLs separated by commas"
-                  className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
-                  Description
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleInputChange}
-                  placeholder="Write vehicle description"
-                  rows="4"
-                  className="w-full border border-gray-300 rounded-lg px-[12px] py-[10px] focus:outline-none focus:ring-2 focus:ring-accent"
-                />
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-[10px] mt-[20px]">
-              <button
-                type="button"
-                onClick={resetForm}
-                className="px-[18px] py-[10px] rounded-lg bg-gray-200 text-gray-700 font-semibold hover:bg-gray-300"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                className="px-[18px] py-[10px] rounded-lg bg-accent text-white font-semibold border border-accent hover:bg-transparent hover:text-accent transition"
-              >
-                {editingVehicle ? "Update Vehicle" : "Save Vehicle"}
-              </button>
-            </div>
-          </form>
-        </div>
-      )}
-
-      {/* Filters */}
-      <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px] mb-[25px]">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-[15px]">
+      <div className="mb-[25px] rounded-2xl border border-gray-200 bg-white p-[20px] shadow-md">
+        <div className="grid grid-cols-1 gap-[15px] md:grid-cols-4">
           <div className="relative">
-            <FaSearch className="absolute top-[15px] left-[15px] text-gray-400" />
+            <FaSearch className="absolute left-[15px] top-[15px] text-gray-400" />
+
             <input
               type="text"
-              placeholder="Search by vehicle, company, city"
+              placeholder="Search model, type or company"
               value={searchText}
-              onChange={(e) => setSearchText(e.target.value)}
-              className="w-full h-[45px] border border-gray-300 rounded-lg pl-[40px] pr-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
+              onChange={(event) =>
+                setSearchText(event.target.value)
+              }
+              className="h-[45px] w-full rounded-lg border border-gray-300 pl-[40px] pr-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
             />
           </div>
 
           <select
             value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-            className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
+            onChange={(event) =>
+              setTypeFilter(event.target.value)
+            }
+            className="h-[45px] rounded-lg border border-gray-300 px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            <option value="all">All Vehicle Types</option>
+            <option value="all">All Types</option>
             <option value="bike">Bike</option>
+            <option value="tuk">Tuk Tuk</option>
             <option value="car">Car</option>
             <option value="van">Van</option>
-            <option value="suv">SUV</option>
             <option value="bus">Bus</option>
-            <option value="tuk">Tuk Tuk</option>
-            <option value="other">Other</option>
           </select>
 
           <select
             value={approvalFilter}
-            onChange={(e) => setApprovalFilter(e.target.value)}
-            className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
+            onChange={(event) =>
+              setApprovalFilter(event.target.value)
+            }
+            className="h-[45px] rounded-lg border border-gray-300 px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
           >
             <option value="all">All Approval Status</option>
-            <option value="approved">Approved Vehicles</option>
-            <option value="pending">Pending Vehicles</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Approved</option>
           </select>
 
           <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
+            value={availabilityFilter}
+            onChange={(event) =>
+              setAvailabilityFilter(event.target.value)
+            }
+            className="h-[45px] rounded-lg border border-gray-300 px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
           >
-            <option value="all">All Status</option>
-            <option value="active">Active Vehicles</option>
-            <option value="inactive">Inactive Vehicles</option>
+            <option value="all">All Availability</option>
+            <option value="available">Available</option>
+            <option value="unavailable">Unavailable</option>
           </select>
         </div>
+
+        {(searchText ||
+          typeFilter !== "all" ||
+          approvalFilter !== "all" ||
+          availabilityFilter !== "all") && (
+          <div className="mt-[15px] flex justify-end">
+            <button
+              type="button"
+              onClick={clearFilters}
+              className="font-semibold text-accent hover:text-orange"
+            >
+              Clear Filters
+            </button>
+          </div>
+        )}
       </div>
 
-      {/* Table */}
-      <div className="w-full bg-white border border-gray-200 rounded-2xl shadow-md p-[20px]">
-        <div className="flex justify-between items-center mb-[20px]">
-          <div>
-            <h2 className="text-xl font-bold text-gray-800">Vehicles</h2>
-            <p className="text-sm text-gray-500">
-              Showing {filteredVehicles.length} vehicle(s)
-            </p>
-          </div>
+      <div className="rounded-2xl border border-gray-200 bg-white p-[20px] shadow-md">
+        <div className="mb-[20px]">
+          <h2 className="text-xl font-bold">
+            Vehicle Submissions
+          </h2>
+
+          <p className="text-sm text-gray-500">
+            Showing {filteredVehicles.length} vehicle(s)
+          </p>
         </div>
 
         {loading ? (
-          <div className="w-full min-h-[250px] flex justify-center items-center text-gray-500">
+          <div className="flex min-h-[250px] items-center justify-center text-gray-500">
             Loading vehicles...
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left min-w-[1150px]">
+            <table className="w-full min-w-[1120px] text-left">
               <thead>
-                <tr className="border-b text-gray-500 text-sm">
+                <tr className="border-b text-sm text-gray-500">
                   <th className="py-[12px]">Vehicle</th>
                   <th className="py-[12px]">Company</th>
                   <th className="py-[12px]">Type</th>
-                  <th className="py-[12px]">Location</th>
+                  <th className="py-[12px]">Seats</th>
                   <th className="py-[12px]">Price</th>
-                  <th className="py-[12px]">Rating</th>
+                  <th className="py-[12px]">Location</th>
                   <th className="py-[12px]">Approval</th>
-                  <th className="py-[12px]">Status</th>
-                  <th className="py-[12px] text-center">Actions</th>
+                  <th className="py-[12px]">Availability</th>
+                  <th className="py-[12px] text-center">
+                    Actions
+                  </th>
                 </tr>
               </thead>
 
               <tbody>
-                {filteredVehicles.map((vehicle) => (
-                  <tr key={vehicle._id} className="border-b text-sm">
-                    <td className="py-[14px]">
-                      <div className="flex items-center gap-[12px]">
-                        {vehicle.images?.[0] ? (
-                          <img
-                            src={vehicle.images[0]}
-                            alt={vehicle.name || vehicle.vehicleName}
-                            className="w-[65px] h-[48px] rounded-lg object-cover border"
-                          />
-                        ) : (
-                          <div className="w-[65px] h-[48px] rounded-lg bg-gray-100 border flex items-center justify-center text-gray-400">
-                            <FaImage />
-                          </div>
-                        )}
+                {filteredVehicles.map((vehicle) => {
+                  const busy =
+                    updatingId === vehicle._id ||
+                    deletingId === vehicle._id;
 
-                        <div>
-                          <p className="font-bold text-gray-800">
-                            {vehicle.name || vehicle.vehicleName}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {vehicle.brand || ""} {vehicle.model || ""}
+                  return (
+                    <tr
+                      key={vehicle._id}
+                      className="border-b text-sm"
+                    >
+                      <td className="py-[14px]">
+                        <div className="flex items-center gap-[12px]">
+                          {getImageUrl(vehicle.image) ? (
+                            <img
+                              src={getImageUrl(vehicle.image)}
+                              alt={vehicle.model || "Vehicle"}
+                              onError={(event) => {
+                                event.currentTarget.style.display =
+                                  "none";
+                              }}
+                              className="h-[48px] w-[65px] rounded-lg border object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-[48px] w-[65px] items-center justify-center rounded-lg border bg-gray-100 text-gray-400">
+                              <FaImage />
+                            </div>
+                          )}
+
+                          <p className="font-bold">
+                            {vehicle.model || "Unnamed vehicle"}
                           </p>
                         </div>
-                      </div>
-                    </td>
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      <p>{vehicle.companyName || vehicle.owner?.name || "Not added"}</p>
-                      <p className="text-xs text-gray-400">
-                        {vehicle.phoneNumber || vehicle.contactNumber || ""}
-                      </p>
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        {getCompanyName(vehicle)}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600 capitalize">
-                      {vehicle.vehicleType || vehicle.type || "car"}
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        {formatType(vehicle.type)}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      <p>{vehicle.city || "Not added"}</p>
-                      <p className="text-xs text-gray-400">
-                        {vehicle.district || vehicle.province || ""}
-                      </p>
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        {vehicle.seats ?? 0}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      Rs. {vehicle.pricePerDay || vehicle.price || 0} / day
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        Rs.{" "}
+                        {Number(
+                          vehicle.pricePerDay || 0
+                        ).toLocaleString("en-LK")}
+                      </td>
 
-                    <td className="py-[14px] text-gray-600">
-                      <div className="flex items-center gap-[5px]">
-                        <FaStar className="text-orange" />
-                        {vehicle.averageRating || vehicle.rating || 0}
-                      </div>
-                    </td>
+                      <td className="py-[14px] text-gray-600">
+                        {formatLocation(vehicle.location)}
+                      </td>
 
-                    <td className="py-[14px]">
-                      <span
-                        className={`px-[10px] py-[5px] rounded-full text-xs text-white ${
-                          vehicle.isApproved ? "bg-green-600" : "bg-orange"
-                        }`}
-                      >
-                        {vehicle.isApproved ? "Approved" : "Pending"}
-                      </span>
-                    </td>
+                      <td className="py-[14px]">
+                        <StatusBadge
+                          active={vehicle.isApproved === true}
+                          activeText="Approved"
+                          inactiveText="Pending"
+                        />
+                      </td>
 
-                    <td className="py-[14px]">
-                      <select
-                        value={
-                          vehicle.status ||
-                          (vehicle.isActive === false ? "inactive" : "active")
-                        }
-                        onChange={(e) =>
-                          handleStatusChange(vehicle, e.target.value)
-                        }
-                        className={`px-[10px] py-[6px] rounded-lg text-xs text-white border-none outline-none ${
-                          vehicle.status === "inactive" ||
-                          vehicle.isActive === false
-                            ? "bg-red-600"
-                            : "bg-green-600"
-                        }`}
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
-                    </td>
+                      <td className="py-[14px]">
+                        <StatusBadge
+                          active={vehicle.isAvailable !== false}
+                          activeText="Available"
+                          inactiveText="Unavailable"
+                        />
+                      </td>
 
-                    <td className="py-[14px]">
-                      <div className="flex justify-center gap-[8px]">
-                        {!vehicle.isApproved && (
+                      <td className="py-[14px]">
+                        <div className="flex justify-center gap-[8px]">
                           <button
-                            onClick={() => handleApprovalChange(vehicle, true)}
-                            className="w-[35px] h-[35px] rounded-lg bg-green-600 hover:bg-green-700 flex items-center justify-center text-white"
-                            title="Approve Vehicle"
+                            type="button"
+                            onClick={() =>
+                              setSelectedVehicle(vehicle)
+                            }
+                            disabled={busy}
+                            className="flex h-[35px] w-[35px] items-center justify-center rounded-lg bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-60"
+                            title="View details"
                           >
-                            <FaCheckCircle />
+                            <FaEye />
                           </button>
-                        )}
 
-                        {vehicle.isApproved && (
+                          {!vehicle.isApproved ? (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                changeApproval(vehicle, true)
+                              }
+                              disabled={busy}
+                              className="flex h-[35px] w-[35px] items-center justify-center rounded-lg bg-green-600 text-white hover:bg-green-700 disabled:opacity-60"
+                              title="Approve vehicle"
+                            >
+                              <FaCheckCircle />
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                changeApproval(vehicle, false)
+                              }
+                              disabled={busy}
+                              className="flex h-[35px] w-[35px] items-center justify-center rounded-lg bg-orange text-white hover:bg-orange/80 disabled:opacity-60"
+                              title="Reject vehicle"
+                            >
+                              <FaTimesCircle />
+                            </button>
+                          )}
+
                           <button
-                            onClick={() => handleApprovalChange(vehicle, false)}
-                            className="w-[35px] h-[35px] rounded-lg bg-orange hover:bg-orange/80 flex items-center justify-center text-white"
-                            title="Reject Vehicle"
+                            type="button"
+                            onClick={() => deleteVehicle(vehicle)}
+                            disabled={busy}
+                            className="flex h-[35px] w-[35px] items-center justify-center rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-60"
+                            title="Delete vehicle"
                           >
-                            <FaTimesCircle />
+                            <FaTrash />
                           </button>
-                        )}
-
-                        <button
-                          onClick={() => openEditForm(vehicle)}
-                          className="w-[35px] h-[35px] rounded-lg bg-blue-600 hover:bg-blue-700 flex items-center justify-center text-white"
-                          title="Edit Vehicle"
-                        >
-                          <FaEdit />
-                        </button>
-
-                        <button
-                          onClick={() => handleDeleteVehicle(vehicle)}
-                          className="w-[35px] h-[35px] rounded-lg bg-red-600 hover:bg-red-700 flex items-center justify-center text-white"
-                          title="Delete Vehicle"
-                        >
-                          <FaTrash />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
 
                 {filteredVehicles.length === 0 && (
                   <tr>
                     <td
                       colSpan="9"
-                      className="py-[30px] text-center text-gray-500"
+                      className="py-[35px] text-center text-gray-500"
                     >
                       No vehicles found
                     </td>
@@ -925,20 +530,163 @@ export default function AdminVehiclesPage() {
           </div>
         )}
       </div>
+
+      {selectedVehicle && (
+        <VehicleModal
+          vehicle={selectedVehicle}
+          busy={
+            updatingId === selectedVehicle._id ||
+            deletingId === selectedVehicle._id
+          }
+          onClose={() => setSelectedVehicle(null)}
+          onApprove={() =>
+            changeApproval(selectedVehicle, true)
+          }
+          onReject={() =>
+            changeApproval(selectedVehicle, false)
+          }
+          onDelete={() => deleteVehicle(selectedVehicle)}
+        />
+      )}
     </div>
   );
 }
 
-function VehicleStatCard({ title, value, icon, color }) {
+function VehicleModal({
+  vehicle,
+  busy,
+  onClose,
+  onApprove,
+  onReject,
+  onDelete,
+}) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl shadow-md p-[20px] flex justify-between items-center">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-[20px]">
+      <div className="max-h-[90vh] w-full max-w-[800px] overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="sticky top-0 flex items-center justify-between border-b bg-white px-[20px] py-[15px]">
+          <div>
+            <h2 className="text-2xl font-bold">
+              {vehicle.model || "Vehicle Details"}
+            </h2>
+            <p className="text-sm text-gray-500">
+              Review this vehicle submission.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-[38px] w-[38px] items-center justify-center rounded-lg bg-gray-200 hover:bg-gray-300"
+          >
+            <FaTimes />
+          </button>
+        </div>
+
+        <div className="p-[20px]">
+          <div className="grid grid-cols-1 gap-[20px] md:grid-cols-2">
+            {getImageUrl(vehicle.image) ? (
+              <img
+                src={getImageUrl(vehicle.image)}
+                alt={vehicle.model || "Vehicle"}
+                className="h-[280px] w-full rounded-xl border object-cover"
+              />
+            ) : (
+              <div className="flex h-[280px] items-center justify-center rounded-xl border bg-gray-100 text-6xl text-gray-400">
+                <FaImage />
+              </div>
+            )}
+
+            <div className="space-y-[12px]">
+              <DetailRow
+                label="Company"
+                value={getCompanyName(vehicle)}
+              />
+              <DetailRow
+                label="Type"
+                value={formatType(vehicle.type)}
+              />
+              <DetailRow
+                label="Model"
+                value={vehicle.model || "Not available"}
+              />
+              <DetailRow
+                label="Seats"
+                value={String(vehicle.seats ?? 0)}
+              />
+              <DetailRow
+                label="Price Per Day"
+                value={`Rs. ${Number(
+                  vehicle.pricePerDay || 0
+                ).toLocaleString("en-LK")}`}
+              />
+              <DetailRow
+                label="Location"
+                value={formatLocation(vehicle.location)}
+              />
+
+              <div className="flex gap-[8px]">
+                <StatusBadge
+                  active={vehicle.isApproved === true}
+                  activeText="Approved"
+                  inactiveText="Pending"
+                />
+                <StatusBadge
+                  active={vehicle.isAvailable !== false}
+                  activeText="Available"
+                  inactiveText="Unavailable"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-[25px] flex justify-end gap-[10px]">
+            <button
+              type="button"
+              onClick={onDelete}
+              disabled={busy}
+              className="rounded-lg bg-red-600 px-[18px] py-[10px] font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+            >
+              Delete Vehicle
+            </button>
+
+            {vehicle.isApproved ? (
+              <button
+                type="button"
+                onClick={onReject}
+                disabled={busy}
+                className="rounded-lg bg-orange px-[18px] py-[10px] font-semibold text-white hover:bg-orange/80 disabled:opacity-60"
+              >
+                Reject Vehicle
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onApprove}
+                disabled={busy}
+                className="rounded-lg bg-green-600 px-[18px] py-[10px] font-semibold text-white hover:bg-green-700 disabled:opacity-60"
+              >
+                Approve Vehicle
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function StatCard({ title, value, icon, color }) {
+  return (
+    <div className="flex items-center justify-between rounded-2xl border border-gray-200 bg-white p-[20px] shadow-md">
       <div>
-        <p className="text-gray-500 text-sm">{title}</p>
-        <h2 className="text-3xl font-bold text-gray-800 mt-[6px]">{value}</h2>
+        <p className="text-sm text-gray-500">{title}</p>
+        <h2 className="mt-[6px] text-3xl font-bold">
+          {value}
+        </h2>
       </div>
 
       <div
-        className={`${color} w-[55px] h-[55px] rounded-full flex items-center justify-center text-white text-2xl`}
+        className={`${color} flex h-[55px] w-[55px] items-center justify-center rounded-full text-2xl text-white`}
       >
         {icon}
       </div>
@@ -946,44 +694,93 @@ function VehicleStatCard({ title, value, icon, color }) {
   );
 }
 
-function InputField({ label, name, value, onChange, placeholder }) {
+function StatusBadge({
+  active,
+  activeText,
+  inactiveText,
+}) {
+  return (
+    <span
+      className={`inline-flex rounded-full px-[10px] py-[5px] text-xs text-white ${
+        active ? "bg-green-600" : "bg-orange"
+      }`}
+    >
+      {active ? activeText : inactiveText}
+    </span>
+  );
+}
+
+function DetailRow({ label, value }) {
   return (
     <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">
         {label}
-      </label>
-
-      <input
-        type="text"
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
-      />
+      </p>
+      <p className="mt-[2px] break-words text-gray-700">
+        {value}
+      </p>
     </div>
   );
 }
 
-function SelectField({ label, name, value, onChange, options }) {
-  return (
-    <div>
-      <label className="block text-sm font-semibold text-gray-700 mb-[6px]">
-        {label}
-      </label>
+function getCompanyName(vehicle) {
+  if (
+    vehicle.companyId &&
+    typeof vehicle.companyId === "object"
+  ) {
+    return (
+      vehicle.companyId.companyName ||
+      vehicle.companyId.name ||
+      vehicle.companyId.email ||
+      vehicle.companyId._id ||
+      "Unknown company"
+    );
+  }
 
-      <select
-        name={name}
-        value={value}
-        onChange={onChange}
-        className="w-full h-[45px] border border-gray-300 rounded-lg px-[12px] focus:outline-none focus:ring-2 focus:ring-accent"
-      >
-        {options.map((option) => (
-          <option key={option.value} value={option.value}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </div>
+  return vehicle.companyId || "Unknown company";
+}
+
+function formatType(type) {
+  if (!type) return "Unknown";
+  if (type === "tuk") return "Tuk Tuk";
+
+  return (
+    type.charAt(0).toUpperCase() +
+    type.slice(1).toLowerCase()
   );
+}
+
+function formatLocation(location) {
+  const latitude = Number(location?.latitude);
+  const longitude = Number(location?.longitude);
+
+  if (
+    !Number.isFinite(latitude) ||
+    !Number.isFinite(longitude) ||
+    (latitude === 0 && longitude === 0)
+  ) {
+    return "Not available";
+  }
+
+  return `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`;
+}
+
+function getImageUrl(image) {
+  const value = String(image || "").trim();
+
+  if (!value) return "";
+
+  if (
+    value.startsWith("http://") ||
+    value.startsWith("https://") ||
+    value.startsWith("data:")
+  ) {
+    return value;
+  }
+
+  const backendOrigin = API_URL.replace(/\/api\/?$/, "");
+
+  return value.startsWith("/")
+    ? `${backendOrigin}${value}`
+    : `${backendOrigin}/${value}`;
 }
