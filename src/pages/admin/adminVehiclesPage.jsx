@@ -13,10 +13,15 @@ import {
 } from "react-icons/fa";
 import { FiRefreshCw } from "react-icons/fi";
 
-const API_URL =
+const RAW_API_URL =
   import.meta.env.VITE_BACKEND_URL ||
   import.meta.env.VITE_API_URL ||
   "http://localhost:3000/api";
+
+const API_URL = `${RAW_API_URL.replace(
+  /\/api\/?$/,
+  ""
+).replace(/\/$/, "")}/api`;
 
 export default function AdminVehiclesPage() {
   const [vehicles, setVehicles] = useState([]);

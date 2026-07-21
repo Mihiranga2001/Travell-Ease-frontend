@@ -47,7 +47,7 @@ export default function LoginPage() {
     } else if (user.role === "hotel_owner") {
       navigate("/hotel-Owner", { replace: true });
     } else if (user.role === "vehicle_company") {
-      navigate("/vehicles", { replace: true });
+      navigate("/vehicle-company", { replace: true });
     } else {
       navigate("/", { replace: true });
     }
