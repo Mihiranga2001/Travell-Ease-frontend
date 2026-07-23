@@ -1,8 +1,31 @@
-import {MdDashboard,MdOutlineRateReview,MdOutlinePendingActions,MdSettings,} from "react-icons/md";
-import {FiUsers,FiMapPin,FiImage,FiBarChart2,} from "react-icons/fi";
-import {FaHotel,FaCar,FaUserTie,FaRobot,} from "react-icons/fa";
-import {LuClipboardList,} from "react-icons/lu";
-import { Link, Route, Routes } from "react-router-dom";
+import {
+  MdDashboard,
+  MdOutlineRateReview,
+  MdOutlinePendingActions,
+  MdSettings,
+} from "react-icons/md";
+
+import {
+  FiUsers,
+  FiMapPin,
+  FiImage,
+  FiBarChart2,
+} from "react-icons/fi";
+
+import {
+  FaHotel,
+  FaCar,
+  FaUserTie,
+  FaRobot,
+} from "react-icons/fa";
+
+import { LuClipboardList } from "react-icons/lu";
+import {
+  NavLink,
+  Route,
+  Routes,
+} from "react-router-dom";
+
 import AdminDashboardPage from "./admin/adminDashboardPage";
 import AdminUsersPage from "./admin/adminUsersPage";
 import AdminTouristPlacesPage from "./admin/adminTouristPlacesPage";
@@ -17,75 +40,205 @@ import AdminAIMonitoringPage from "./admin/adminAIMonitoringPage";
 import AdminReportsPage from "./admin/adminReportsPage";
 import AdminSettingsPage from "./admin/adminSettingsPage";
 
-
 export default function AdminPage() {
+  const linkClass = ({ isActive }) =>
+    `w-full flex items-center min-h-[42px] gap-[10px] px-[12px] py-[8px] rounded-lg transition ${
+      isActive
+        ? "bg-primary text-accent font-semibold"
+        : "text-primary hover:bg-primary/20"
+    }`;
+
   return (
     <div className="w-full min-h-screen bg-accent flex">
-        <div className="w-[250px] bg-accent min-h-screen">
-            <div className="w-full h-[100px] gap-5 pl-[10px] flex items-center text-primary">
-                <img src="/logo.png" className="h-[50px] w-[150px]"/>
-                <h1 className="text-2xl text-center">Admin</h1>
-            </div>
-            <div className="w-full text-1.7xl text-primary flex flex-col gap-[10px] pl-[20px]">
+      {/* Sidebar */}
+      <aside className="w-[250px] min-w-[250px] bg-accent min-h-screen">
+        <div className="w-full h-[100px] gap-[10px] px-[15px] flex items-center text-primary">
+          <img
+            src="/logo.png"
+            alt="Application logo"
+            className="h-[50px] w-[140px] object-contain"
+          />
 
-                <Link to="/admin" className="w-full flex items-center h-[30px] gap-[5px]"><MdDashboard />Dashboard</Link>
-
-                <Link to="/admin/users" className="w-full flex items-center h-[30px] gap-[5px]"> <FiUsers />Users</Link>
-
-                <Link to="/admin/places" className="w-full flex items-center h-[30px] gap-[5px]"><FiMapPin />Tourist Places</Link>
-
-                <Link to="/admin/hotels" className="w-full flex items-center h-[30px] gap-[5px]"><FaHotel />Hotels</Link>
-
-                <Link to="/admin/vehicles" className="w-full flex items-center h-[30px] gap-[5px]"><FaCar />Vehicles</Link>
-
-                <Link to="/admin/guides" className="w-full flex items-center h-[30px] gap-[5px]"><FaUserTie />Travel Guides</Link>
-
-                <Link to="/admin/bookings" className="w-full flex items-center h-[30px] gap-[5px]"><LuClipboardList />Bookings</Link>
-
-                <Link to="/admin/media" className="w-full flex items-center h-[30px] gap-[5px]"><FiImage />Media Approval</Link>
-
-                <Link to="/admin/reviews" className="w-full flex items-center h-[30px] gap-[5px]"><MdOutlineRateReview />Reviews</Link>
-
-                <Link to="/admin/approvals" className="w-full flex items-center h-[30px] gap-[5px]"><MdOutlinePendingActions />Approvals</Link>
-
-                <Link to="/admin/ai-monitoring" className="w-full flex items-center h-[30px] gap-[5px]"><FaRobot />AI Monitoring</Link>
-
-                <Link to="/admin/reports" className="w-full flex items-center h-[30px] gap-[5px]"><FiBarChart2 />Reports</Link>
-
-                <Link to="/admin/settings" className="w-full flex items-center h-[30px] gap-[5px]"><MdSettings />Settings</Link>
-                
-            </div>
-
+          <h1 className="text-2xl font-bold">Admin</h1>
         </div>
-        <div className="w-[calc(100%-250px)] min-h-screen max-h-full bg-primary border-[10px] rounded-3xl border-accent">
-            <Routes>
-                <Route path="/" element={<AdminDashboardPage/>} />
 
-                <Route path="/users" element={<AdminUsersPage />} />
+        <nav className="w-full text-lg flex flex-col gap-[5px] px-[15px] pb-[25px]">
+          <NavLink
+            to="/admin"
+            end
+            className={linkClass}
+          >
+            <MdDashboard />
+            Dashboard
+          </NavLink>
 
-                <Route path="/places" element={<AdminTouristPlacesPage />} />
+          <NavLink
+            to="/admin/users"
+            className={linkClass}
+          >
+            <FiUsers />
+            Users
+          </NavLink>
 
-                <Route path="/hotels" element={<AdminHotelsPage />} />
+          <NavLink
+            to="/admin/places"
+            className={linkClass}
+          >
+            <FiMapPin />
+            Tourist Places
+          </NavLink>
 
-                <Route path="/vehicles" element={<AdminVehiclesPage/>} />
+          <NavLink
+            to="/admin/hotels"
+            className={linkClass}
+          >
+            <FaHotel />
+            Hotels
+          </NavLink>
 
-                <Route path="/guides" element={<AdminTravelGuidesPage/>} />
+          <NavLink
+            to="/admin/vehicles"
+            className={linkClass}
+          >
+            <FaCar />
+            Vehicles
+          </NavLink>
 
-                <Route path="/bookings" element={<AdminBookingsPage/>} />
+          <NavLink
+            to="/admin/travel-guides"
+            className={linkClass}
+          >
+            <FaUserTie />
+            Travel Guides
+          </NavLink>
 
-                <Route path="/media" element={<AdminMediaApprovalPage/>} />
+          <NavLink
+            to="/admin/bookings"
+            className={linkClass}
+          >
+            <LuClipboardList />
+            Bookings
+          </NavLink>
 
-                <Route path="/reviews" element={<AdminReviewsPage/>} />
+          <NavLink
+            to="/admin/media"
+            className={linkClass}
+          >
+            <FiImage />
+            Media Approval
+          </NavLink>
 
-                <Route path="/approvals" element={<AdminApprovalsPage/>} />
+          <NavLink
+            to="/admin/reviews"
+            className={linkClass}
+          >
+            <MdOutlineRateReview />
+            Reviews
+          </NavLink>
 
-                <Route path="/ai-monitoring" element={<AdminAIMonitoringPage/>} />
+          <NavLink
+            to="/admin/approvals"
+            className={linkClass}
+          >
+            <MdOutlinePendingActions />
+            Approvals
+          </NavLink>
 
-                <Route path="/reports" element={<AdminReportsPage/>} />
+          <NavLink
+            to="/admin/ai-monitoring"
+            className={linkClass}
+          >
+            <FaRobot />
+            AI Monitoring
+          </NavLink>
 
-                <Route path="/settings" element={<AdminSettingsPage/>}/>
-            </Routes>    
-        </div>
+          <NavLink
+            to="/admin/reports"
+            className={linkClass}
+          >
+            <FiBarChart2 />
+            Reports
+          </NavLink>
+
+          <NavLink
+            to="/admin/settings"
+            className={linkClass}
+          >
+            <MdSettings />
+            Settings
+          </NavLink>
+        </nav>
+      </aside>
+
+      {/* Page content */}
+      <main className="flex-1 min-w-0 min-h-screen bg-primary border-[10px] rounded-3xl border-accent overflow-hidden">
+        <Routes>
+          <Route
+            index
+            element={<AdminDashboardPage />}
+          />
+
+          <Route
+            path="users"
+            element={<AdminUsersPage />}
+          />
+
+          <Route
+            path="places"
+            element={<AdminTouristPlacesPage />}
+          />
+
+          <Route
+            path="hotels"
+            element={<AdminHotelsPage />}
+          />
+
+          <Route
+            path="vehicles"
+            element={<AdminVehiclesPage />}
+          />
+
+          <Route
+            path="travel-guides"
+            element={<AdminTravelGuidesPage />}
+          />
+
+          <Route
+            path="bookings"
+            element={<AdminBookingsPage />}
+          />
+
+          <Route
+            path="media"
+            element={<AdminMediaApprovalPage />}
+          />
+
+          <Route
+            path="reviews"
+            element={<AdminReviewsPage />}
+          />
+
+          <Route
+            path="approvals"
+            element={<AdminApprovalsPage />}
+          />
+
+          <Route
+            path="ai-monitoring"
+            element={<AdminAIMonitoringPage />}
+          />
+
+          <Route
+            path="reports"
+            element={<AdminReportsPage />}
+          />
+
+          <Route
+            path="settings"
+            element={<AdminSettingsPage />}
+          />
+        </Routes>
+      </main>
     </div>
   );
 }

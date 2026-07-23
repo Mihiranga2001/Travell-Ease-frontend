@@ -32,7 +32,7 @@ export default function Header() {
     },
     {
       name: "Guides",
-      path: "/guides",
+      path: "/travel-guides",
       icon: <FaUserTie />,
     },
     {

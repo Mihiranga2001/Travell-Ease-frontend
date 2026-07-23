@@ -8,6 +8,8 @@ import HotelOwnerPage from './pages/hotelOwnerPage';
 import VehiclePage from './pages/vehiclePage';
 import VehicleCompanyPage from "./pages/vehicleCompanyPage";
 import VehicleDetailsPage from "./pages/VehicleDetailsPage";
+import TravelGuidesPage from "./pages/travelGuidesPage";
+import GuidePage from "./pages/guidePage";
 import RegisterPage from './pages/registerPage';
 import HomePage from './pages/homePage';
 import DiscoverPage from './pages/discoverPage';
@@ -27,6 +29,8 @@ function App() {
           <Route path="/vehicles/*" element={<VehiclePage />} />
           <Route path="/vehicle-company/*" element={<VehicleCompanyPage />}/>
           <Route path="/vehicles/:id" element={<VehicleDetailsPage />}/>
+          <Route path="/travel-guides/*" element={<TravelGuidesPage />}/>
+          <Route path="/guide/*" element={<GuidePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/Places" element={<DiscoverPage />} />
           <Route path="/hotels" element={<HotelPage />} />

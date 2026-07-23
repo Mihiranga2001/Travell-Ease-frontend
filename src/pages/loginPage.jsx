@@ -48,6 +48,8 @@ export default function LoginPage() {
       navigate("/hotel-Owner", { replace: true });
     } else if (user.role === "vehicle_company") {
       navigate("/vehicle-company", { replace: true });
+    } else if (user.role === "guide") {
+      navigate("/guide", { replace: true });
     } else {
       navigate("/", { replace: true });
     }
