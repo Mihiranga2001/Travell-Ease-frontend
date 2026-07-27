@@ -1,5 +1,4 @@
 import { useMemo, useState } from "react";
-
 import {
   Link,
   Navigate,
@@ -8,14 +7,12 @@ import {
   Routes,
   useNavigate,
 } from "react-router-dom";
-
 import {
   MdDashboard,
   MdOutlineRateReview,
   MdSettings,
   MdWorkOutline,
 } from "react-icons/md";
-
 import {
   FiBarChart2,
   FiCalendar,
@@ -24,16 +21,20 @@ import {
   FiUser,
   FiX,
 } from "react-icons/fi";
-
 import {
   FaLanguage,
   FaMoneyBillWave,
 } from "react-icons/fa";
 
-/*
-  Do not import GuideDashboardPage or GuideProfilePage
-  until those files are created.
-*/
+import GuideDashboardPage from "./guide/guideDashboardPage";
+import GuideProfilePage from "./guide/guideProfilePage";
+import GuideBookingsPage from "./guide/guideBookingsPage";
+import GuideAvailabilityPage from "./guide/guideAvailabilityPage";
+import GuideLanguagesPage from "./guide/guideLanguagesPage";
+import GuideReviewsPage from "./guide/guideReviewsPage";
+import GuideEarningsPage from "./guide/guideEarningsPage";
+import GuideReportsPage from "./guide/guideReportsPage";
+import GuideSettingsPage from "./guide/guideSettingsPage";
 
 const MENU_ITEMS = [
   {
@@ -85,17 +86,12 @@ const MENU_ITEMS = [
 ];
 
 export default function GuidePage() {
-  const [sidebarOpen, setSidebarOpen] =
-    useState(false);
-
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
 
   const loggedInUser = useMemo(() => {
     try {
-      return (
-        JSON.parse(localStorage.getItem("user")) ||
-        null
-      );
+      return JSON.parse(localStorage.getItem("user")) || null;
     } catch {
       return null;
     }
@@ -107,13 +103,7 @@ export default function GuidePage() {
       ""
   ).toLowerCase();
 
-  const allowedRoles = [
-    "guide",
-    "travel_guide",
-    "admin",
-  ];
-
-  if (!allowedRoles.includes(role)) {
+  if (!["guide", "travel_guide", "admin"].includes(role)) {
     return <Navigate to="/" replace />;
   }
 
@@ -121,10 +111,7 @@ export default function GuidePage() {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("role");
-
-    navigate("/login", {
-      replace: true,
-    });
+    navigate("/login", { replace: true });
   }
 
   function closeSidebar() {
@@ -133,7 +120,6 @@ export default function GuidePage() {
 
   return (
     <div className="w-full min-h-screen bg-accent flex">
-      {/* Mobile menu button */}
       <button
         type="button"
         onClick={() => setSidebarOpen(true)}
@@ -143,7 +129,6 @@ export default function GuidePage() {
         <FiMenu />
       </button>
 
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <button
           type="button"
@@ -153,7 +138,6 @@ export default function GuidePage() {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={`fixed lg:static top-0 left-0 z-50 w-[250px] min-h-screen bg-accent text-primary transition-transform duration-300 ${
           sidebarOpen
@@ -161,7 +145,7 @@ export default function GuidePage() {
             : "-translate-x-full lg:translate-x-0"
         }`}
       >
-        <div className="w-full h-[100px] px-[10px] flex items-center justify-between border-b border-white/10">
+        <div className="w-full h-[125px] px-[10px] flex items-center justify-between border-b border-white/10">
           <Link
             to="/guide"
             onClick={closeSidebar}
@@ -178,7 +162,7 @@ export default function GuidePage() {
                 Travel Guide
               </h1>
 
-              <p className="max-w-[95px] truncate text-xs text-white/70">
+              <p className="max-w-[100px] truncate text-xs text-white/70">
                 {getUserName(loggedInUser)}
               </p>
             </div>
@@ -209,10 +193,7 @@ export default function GuidePage() {
                 }`
               }
             >
-              <span className="text-lg">
-                {item.icon}
-              </span>
-
+              <span className="text-lg">{item.icon}</span>
               {item.label}
             </NavLink>
           ))}
@@ -228,150 +209,20 @@ export default function GuidePage() {
         </nav>
       </aside>
 
-      {/* Main content */}
       <main className="flex-1 min-w-0 min-h-screen bg-primary lg:border-[10px] lg:rounded-3xl lg:border-accent overflow-y-auto">
         <Routes>
-          <Route
-            index
-            element={
-              <TemporaryPage
-                title="Guide Dashboard"
-                description="View your profile status, bookings, availability, ratings, and earnings."
-                icon={<MdDashboard />}
-              />
-            }
-          />
-
-          <Route
-            path="profile"
-            element={
-              <TemporaryPage
-                title="My Profile"
-                description="Manage your languages, experience, specialties, daily price, and profile information."
-                icon={<FiUser />}
-              />
-            }
-          />
-
-          <Route
-            path="bookings"
-            element={
-              <TemporaryPage
-                title="Bookings"
-                description="Customer travel guide bookings will be displayed and managed here."
-                icon={<FiCalendar />}
-              />
-            }
-          />
-
-          <Route
-            path="availability"
-            element={
-              <TemporaryPage
-                title="Availability"
-                description="Update your availability status and available working dates here."
-                icon={<MdWorkOutline />}
-              />
-            }
-          />
-
-          <Route
-            path="languages"
-            element={
-              <TemporaryPage
-                title="Languages & Skills"
-                description="Manage your spoken languages, specialties, and travel guide skills here."
-                icon={<FaLanguage />}
-              />
-            }
-          />
-
-          <Route
-            path="reviews"
-            element={
-              <TemporaryPage
-                title="Reviews"
-                description="Customer ratings and reviews for your travel guide services will appear here."
-                icon={<MdOutlineRateReview />}
-              />
-            }
-          />
-
-          <Route
-            path="earnings"
-            element={
-              <TemporaryPage
-                title="Earnings"
-                description="View your travel guide booking income and payment information here."
-                icon={<FaMoneyBillWave />}
-              />
-            }
-          />
-
-          <Route
-            path="reports"
-            element={
-              <TemporaryPage
-                title="Reports"
-                description="Travel guide booking, income, rating, and performance reports will be displayed here."
-                icon={<FiBarChart2 />}
-              />
-            }
-          />
-
-          <Route
-            path="settings"
-            element={
-              <TemporaryPage
-                title="Settings"
-                description="Manage travel guide account and notification settings here."
-                icon={<MdSettings />}
-              />
-            }
-          />
-
-          <Route
-            path="*"
-            element={
-              <Navigate to="/guide" replace />
-            }
-          />
+          <Route index element={<GuideDashboardPage />} />
+          <Route path="profile" element={<GuideProfilePage />} />
+          <Route path="bookings" element={<GuideBookingsPage />} />
+          <Route path="availability" element={<GuideAvailabilityPage />} />
+          <Route path="languages" element={<GuideLanguagesPage />} />
+          <Route path="reviews" element={<GuideReviewsPage />} />
+          <Route path="earnings" element={<GuideEarningsPage />} />
+          <Route path="reports" element={<GuideReportsPage />} />
+          <Route path="settings" element={<GuideSettingsPage />} />
+          <Route path="*" element={<Navigate to="/guide" replace />} />
         </Routes>
       </main>
-    </div>
-  );
-}
-
-function TemporaryPage({
-  title,
-  description,
-  icon,
-}) {
-  return (
-    <div className="w-full min-h-screen p-[25px] pt-[75px] lg:pt-[25px] text-gray-800">
-      <div className="mb-[25px]">
-        <h1 className="text-3xl font-bold text-accent">
-          {title}
-        </h1>
-
-        <p className="text-gray-500 mt-[5px]">
-          {description}
-        </p>
-      </div>
-
-      <div className="min-h-[430px] bg-white border border-gray-200 rounded-2xl shadow-md p-[25px] flex flex-col items-center justify-center text-center">
-        <div className="w-[80px] h-[80px] rounded-full bg-accent text-white text-4xl flex items-center justify-center mb-[20px]">
-          {icon}
-        </div>
-
-        <h2 className="text-2xl font-bold text-gray-800 mb-[10px]">
-          {title}
-        </h2>
-
-        <p className="max-w-[680px] text-gray-500 leading-7">
-          {description}
-        </p>
-      </div>
     </div>
   );
 }
@@ -385,16 +236,11 @@ function getUserName(user) {
     return user.name;
   }
 
-  const fullName = [
-    user.firstName,
-    user.lastName,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .trim();
-
   return (
-    fullName ||
+    [user.firstName, user.lastName]
+      .filter(Boolean)
+      .join(" ")
+      .trim() ||
     user.username ||
     user.email ||
     "Guide"
