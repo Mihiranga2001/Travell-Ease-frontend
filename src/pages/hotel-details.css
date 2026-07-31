@@ -1,0 +1,14 @@
+.form-control {
+  width: 100%;
+  min-height: 48px;
+  border: 1px solid rgb(209 213 219);
+  border-radius: 0.75rem;
+  background: white;
+  padding: 0.75rem;
+  outline: none;
+}
+
+.form-control:focus {
+  border-color: transparent;
+  box-shadow: 0 0 0 2px var(--color-accent, #2f3f8f);
+}

@@ -14,6 +14,9 @@ import RegisterPage from './pages/registerPage';
 import HomePage from './pages/homePage';
 import DiscoverPage from './pages/discoverPage';
 import HotelPage from './pages/hotelsPage';
+import HotelDetailsPage from "./pages/HotelDetailsPage";
+import TravelerBookingsPage from "./pages/TravelerBookingsPage";
+import TravelerProfilePage from "./pages/TravelerProfilePage";
 import { Toaster } from "react-hot-toast";
 
 function App() {
@@ -34,6 +37,12 @@ function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/Places" element={<DiscoverPage />} />
           <Route path="/hotels" element={<HotelPage />} />
+          <Route path="/hotels/:id" element={<HotelDetailsPage />} />
+          <Route path="/vehicles/:id" element={<VehicleDetailsPage />} />
+
+          <Route path="/my-bookings" element={<TravelerBookingsPage />}/>
+
+          <Route path="/profile" element={<TravelerProfilePage />}/>
         </Routes>
       </BrowserRouter>
     </div>

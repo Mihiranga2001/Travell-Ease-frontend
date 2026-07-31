@@ -1,13 +1,13 @@
 import { Link } from "react-router-dom";
 import {
+  FaEnvelope,
   FaFacebookF,
   FaInstagram,
-  FaYoutube,
   FaLinkedinIn,
   FaMapMarkerAlt,
   FaPhoneAlt,
-  FaEnvelope,
   FaPlaneDeparture,
+  FaYoutube,
 } from "react-icons/fa";
 
 export default function Footer() {
@@ -15,65 +15,53 @@ export default function Footer() {
 
   return (
     <footer className="bg-secondary text-white">
-      <div className="max-w-7xl mx-auto px-6 lg:px-8 py-14">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-10">
-          
-          {/* Brand */}
+      <div className="mx-auto max-w-7xl px-6 py-14 lg:px-8">
+        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4">
           <div>
-            <Link to="/" className="inline-flex items-center gap-3 mb-5">
+            <Link to="/" className="mb-5 inline-flex items-center gap-3">
               <img
                 src="/logo.png"
-                alt="Travel Ease Logo"
+                alt="Travel Ease"
                 className="h-14 w-auto object-contain"
               />
             </Link>
 
-            <p className="text-gray-300 leading-7 mb-6">
+            <p className="mb-6 leading-7 text-gray-300">
               Travel Ease helps travelers discover destinations, book hotels,
-              rent vehicles, find guides, and plan trips with smart AI support.
+              rent vehicles, find guides, and plan complete journeys in one
+              place.
             </p>
 
             <div className="flex items-center gap-3">
-              <SocialIcon icon={<FaFacebookF />} />
-              <SocialIcon icon={<FaInstagram />} />
-              <SocialIcon icon={<FaYoutube />} />
-              <SocialIcon icon={<FaLinkedinIn />} />
+              <SocialIcon href="#" label="Facebook" icon={<FaFacebookF />} />
+              <SocialIcon href="#" label="Instagram" icon={<FaInstagram />} />
+              <SocialIcon href="#" label="YouTube" icon={<FaYoutube />} />
+              <SocialIcon href="#" label="LinkedIn" icon={<FaLinkedinIn />} />
             </div>
           </div>
 
-          {/* Quick Links */}
+          <FooterSection title="Quick Links">
+            <FooterLink to="/" text="Home" />
+            <FooterLink to="/places" text="Discover" />
+            <FooterLink to="/hotels" text="Hotels" />
+            <FooterLink to="/vehicles" text="Vehicles" />
+            <FooterLink to="/travel-guides" text="Travel Guides" />
+          </FooterSection>
+
+          <FooterSection title="Traveler Services">
+            <FooterLink to="/my-bookings" text="My Bookings" />
+            <FooterLink to="/ai-planner" text="AI Trip Planner" />
+            <FooterLink to="/community" text="Travel Community" />
+            <FooterLink to="/hotel-owner" text="Hotel Owner Portal" />
+            <FooterLink to="/vehicle-company" text="Vehicle Company Portal" />
+          </FooterSection>
+
           <div>
-            <h3 className="text-xl font-bold mb-5 text-white">Quick Links</h3>
-
-            <ul className="space-y-3 text-gray-300">
-              <FooterLink to="/" text="Home" />
-              <FooterLink to="/discover" text="Discover" />
-              <FooterLink to="/hotels" text="Hotels" />
-              <FooterLink to="/vehicles" text="Vehicles" />
-              <FooterLink to="/guides" text="Travel Guides" />
-            </ul>
-          </div>
-
-          {/* Services */}
-          <div>
-            <h3 className="text-xl font-bold mb-5 text-white">Services</h3>
-
-            <ul className="space-y-3 text-gray-300">
-              <FooterLink to="/ai-planner" text="AI Trip Planner" />
-              <FooterLink to="/community" text="Travel Community" />
-              <FooterLink to="/hotel-owner" text="Hotel Owner" />
-              <FooterLink to="/vehicle-owner" text="Vehicle Rental" />
-              <FooterLink to="/guide-register" text="Become a Guide" />
-            </ul>
-          </div>
-
-          {/* Contact */}
-          <div>
-            <h3 className="text-xl font-bold mb-5 text-white">Contact Us</h3>
+            <h3 className="mb-5 text-xl font-bold">Contact Us</h3>
 
             <div className="space-y-4 text-gray-300">
               <div className="flex items-start gap-3">
-                <FaMapMarkerAlt className="text-orange mt-1" />
+                <FaMapMarkerAlt className="mt-1 text-orange" />
                 <p>Sri Lanka</p>
               </div>
 
@@ -90,7 +78,7 @@ export default function Footer() {
 
             <Link
               to="/contact"
-              className="inline-flex items-center gap-2 mt-6 bg-orange text-white px-5 py-3 rounded-full font-semibold hover:bg-white hover:text-accent transition"
+              className="mt-6 inline-flex items-center gap-2 rounded-full bg-orange px-5 py-3 font-semibold text-white transition hover:bg-white hover:text-accent"
             >
               <FaPlaneDeparture />
               Contact Now
@@ -98,18 +86,16 @@ export default function Footer() {
           </div>
         </div>
 
-        {/* Bottom */}
-        <div className="border-t border-white/10 mt-12 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-gray-400 text-sm">
+        <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-white/10 pt-6 md:flex-row">
+          <p className="text-sm text-gray-400">
             © {currentYear} Travel Ease. All rights reserved.
           </p>
 
           <div className="flex items-center gap-5 text-sm text-gray-400">
-            <Link to="/privacy-policy" className="hover:text-orange transition">
+            <Link to="/privacy-policy" className="transition hover:text-orange">
               Privacy Policy
             </Link>
-
-            <Link to="/terms" className="hover:text-orange transition">
+            <Link to="/terms" className="transition hover:text-orange">
               Terms & Conditions
             </Link>
           </div>
@@ -119,21 +105,31 @@ export default function Footer() {
   );
 }
 
+function FooterSection({ title, children }) {
+  return (
+    <div>
+      <h3 className="mb-5 text-xl font-bold">{title}</h3>
+      <ul className="space-y-3 text-gray-300">{children}</ul>
+    </div>
+  );
+}
+
 function FooterLink({ to, text }) {
   return (
     <li>
-      <Link to={to} className="hover:text-orange transition">
+      <Link to={to} className="transition hover:text-orange">
         {text}
       </Link>
     </li>
   );
 }
 
-function SocialIcon({ icon }) {
+function SocialIcon({ href, label, icon }) {
   return (
     <a
-      href="#"
-      className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-orange transition"
+      href={href}
+      aria-label={label}
+      className="flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-orange"
     >
       {icon}
     </a>
